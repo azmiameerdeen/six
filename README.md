@@ -44,3 +44,6 @@ Service pages have a right-click menu: spelling suggestions, open/copy link, cop
 
 ## Hardware video
 Six asks Chromium to decode and encode video on the GPU through VA-API (needs `intel-media-va-driver` on Intel). If calls or videos show glitches or black frames, add `"_hardwareVideo":false` to `~/.config/Six/settings.json` and restart Six.
+
+## YouTube Music ads
+While **Block ads and trackers** is on, the YouTube Music tab removes ad slots from YouTube's player data before playback, so most ads never start; any ad that still appears is muted, run to its end and skipped. Turning the switch off or on takes effect the next time the YouTube Music tab opens (for example after restarting Six). YouTube changes its player often, so this can stop working until it is updated.

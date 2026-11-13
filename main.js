@@ -50,6 +50,8 @@ function setSleeping(id,sleeping){
 const blockedHosts=new Map();let blockedWrite=null;
 function noteBlocked(id,url){let host;try{host=new URL(url).hostname}catch{return}const set=blockedHosts.get(id)||new Set();if(set.has(host))return;set.add(host);blockedHosts.set(id,set);
  blockedWrite??=setTimeout(()=>{blockedWrite=null;try{fs.writeFileSync(path.join(app.getPath('userData'),'adblock-blocked.txt'),[...blockedHosts].map(([sid,hosts])=>sid+': '+[...hosts].sort().join(' ')).join('\n')+'\n')}catch{}},5000);}
+// Teams reports call activity; YouTube Music gets ad removal while ad blocking is on (applies when the tab next opens).
+function preloadFor(id){if(id==='teams')return path.join(__dirname,'teams-call-preload.js');if(id==='ytmusic'&&settings._adblock!==false)return path.join(__dirname,'ytmusic-preload.js')}
 function external(url){if(safeURL(url))shell.openExternal(url)}
 function focusService(){const e=views.get(active);if(e&&!e.view.webContents.isDestroyed())e.view.webContents.focus()}
 function refreshControls(){
@@ -77,7 +79,7 @@ function configureContents(wc,s,ses){
  wc.setUserAgent(browserUserAgent(wc.getUserAgent()));
  wc.setAudioMuted(audioMuted(settings,s.id));
  wc.setWindowOpenHandler(({url})=>{
-  if(popupAllowed(url,wc.getURL()))return {action:'allow',overrideBrowserWindowOptions:{parent:win,autoHideMenuBar:true,webPreferences:{session:ses,preload:s.id==='teams'?path.join(__dirname,'teams-call-preload.js'):undefined,nodeIntegration:false,contextIsolation:true,sandbox:true}}};
+  if(popupAllowed(url,wc.getURL()))return {action:'allow',overrideBrowserWindowOptions:{parent:win,autoHideMenuBar:true,webPreferences:{session:ses,preload:preloadFor(s.id),nodeIntegration:false,contextIsolation:true,sandbox:true}}};
   if(safeURL(url))external(url);
   return {action:'deny'};
  });
@@ -122,7 +124,7 @@ function make(s){
    const result=await dialog.showMessageBox(win,{type:'question',buttons:['Deny','Allow'],defaultId:0,cancelId:0,message:s.name+' requests microphone / camera access',detail:'Origin: '+(details.requestingUrl||wc.getURL())});callback(result.response===1);
   }else callback(false);
  });
- const view=new WebContentsView({webPreferences:{session:ses,preload:s.id==='teams'?path.join(__dirname,'teams-call-preload.js'):undefined,nodeIntegration:false,contextIsolation:true,sandbox:true,backgroundThrottling:true,webSecurity:true}}),wc=view.webContents;
+ const view=new WebContentsView({webPreferences:{session:ses,preload:preloadFor(s.id),nodeIntegration:false,contextIsolation:true,sandbox:true,backgroundThrottling:true,webSecurity:true}}),wc=view.webContents;
  configureContents(wc,s,ses);
  wc.on('did-start-navigation',(_event,_url,_inPlace,isMainFrame)=>{if(s.id==='teams'&&isMainFrame&&!_inPlace){const e=views.get(s.id);if(e){e.callMonitorReady=false;e.callActive=false}}});
  wc.on('render-process-gone',(_event,details)=>{
