@@ -1,0 +1,13 @@
+if(process.env.SIX_SMOKE==='1')app.whenReady().then(()=>setTimeout(async()=>{
+ try{
+  await win.webContents.executeJavaScript("window.six.action('home')");
+  await win.webContents.capturePage().then(i=>fs.writeFileSync('/tmp/six-preview.png',i.toPNG()));
+  console.log('SMOKE home: '+JSON.stringify({loaded:views.size,metrics:app.getAppMetrics().map(p=>({type:p.type,memoryMB:Math.round(p.memory.workingSetSize/1024)}))}));
+  select('discord');await new Promise(r=>setTimeout(r,5000));console.log('SMOKE discord URL: '+views.get('discord').view.webContents.getURL());
+  select('whatsapp');await new Promise(r=>setTimeout(r,5000));console.log('SMOKE whatsapp URL: '+views.get('whatsapp').view.webContents.getURL());
+  release('discord');console.log('SMOKE release: '+JSON.stringify([...views.keys()]));
+  detach();active=null;release('whatsapp');state();
+ }catch(e){console.error('SMOKE FAILED',e);process.exitCode=1}
+ quitting=true;app.quit();
+},1500));
+

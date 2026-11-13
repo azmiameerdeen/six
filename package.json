@@ -1,0 +1,1 @@
+{"name":"six-messenger","version":"0.1.0","private":true,"main":"main.js","scripts":{"start":"electron .","test":"node --test"},"devDependencies":{"electron":"https://github.com/castlabs/electron-releases#v44.9.3+wvcus"}}
