@@ -1,5 +1,5 @@
 # Six
-A small Ubuntu desktop home for Discord, WhatsApp, Threads, Teams, Telegram, and Spotify.
+A small Ubuntu desktop home for Discord, WhatsApp, Threads, Teams, Telegram, and YouTube Music.
 
 ## Resource behavior
 - Loads all six services at startup in staggered intervals, including when starting in the tray.
@@ -31,12 +31,12 @@ Teams microphone, camera, and speaker-selection permissions are allowed automati
 
 Teams call protection monitors only boolean WebRTC and live media-track activity, including muted tracks. It does not read, record, or transmit call contents. Teams stays awake during calls or sharing and waits five idle minutes after activity ends. If the activity monitor is unavailable, Teams stays awake as a precaution. 
 
-## Spotify
-Six runs on castlabs' Electron build (`44.9.3+wvcus`), which includes Widevine so the Spotify web player can play music. Widevine is only granted to Spotify's HTTPS pages. On first start Widevine downloads its CDM, so Spotify may take a few seconds longer to load the first time. Spotify pauses after 5 idle minutes like other services, but never while music is playing.
+## YouTube Music
+Six runs on castlabs' Electron build (`44.9.3+wvcus`), which includes Widevine for YouTube Music tracks that need protected playback. Widevine is only granted to YouTube's HTTPS pages. Sign in with your Google account in the tab; Google sign-in popups stay inside Six. YouTube Music pauses after 5 idle minutes like other services, but never while music is playing.
 
 ## Scrollbars and ad blocking
 Scrollbars are hidden in every service and in Six itself; scrolling with the wheel, touchpad and keyboard still works.
-Requests to known ad and tracking servers are blocked using Peter Lowe's list (bundled as `adblock-hosts.txt`, ~3,500 hosts). Pages you open are never blocked, only what they load. Toggle it from the tray menu with **Block ads and trackers**; when off, no request passes through Six's filter at all. This is network blocking only: ads a site serves from its own servers (for example sponsored posts in Threads or Spotify's audio ads) are not removed.
+Requests to known ad and tracking servers are blocked using Peter Lowe's list (bundled as `adblock-hosts.txt`, ~3,500 hosts). Pages you open are never blocked, only what they load. Toggle it from the tray menu with **Block ads and trackers**; when off, no request passes through Six's filter at all. This is network blocking only: ads a site serves from its own servers (for example sponsored posts in Threads or YouTube's own video and audio ads) are not removed.
 Hosts blocked for each service are recorded in `~/.config/Six/adblock-blocked.txt`; if a page breaks, check there and remove the host from `adblock-hosts.txt`.
 
 ## Right-click menu

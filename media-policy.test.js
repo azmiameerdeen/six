@@ -5,11 +5,11 @@ test('Teams device permissions granted only on official HTTPS Teams origins',()=
  assert.equal(teamsMediaAllowed('discord','media','https://teams.microsoft.com'),false);
  assert.equal(teamsMediaAllowed('teams','display-capture','https://teams.microsoft.com'),true);
 });
-test('Widevine is allowed only for Spotify on spotify.com over HTTPS',()=>{
+test('Widevine is allowed only for YouTube Music on YouTube over HTTPS',()=>{
  const {protectedMediaAllowed}=require('./media-policy');
- assert.equal(protectedMediaAllowed('spotify','mediaKeySystem','https://open.spotify.com/'),true);
- assert.equal(protectedMediaAllowed('spotify','mediaKeySystem','http://open.spotify.com/'),false);
- assert.equal(protectedMediaAllowed('spotify','mediaKeySystem','https://spotify.com.evil.test/'),false);
- assert.equal(protectedMediaAllowed('discord','mediaKeySystem','https://open.spotify.com/'),false);
- assert.equal(protectedMediaAllowed('spotify','media','https://open.spotify.com/'),false);
+ assert.equal(protectedMediaAllowed('ytmusic','mediaKeySystem','https://music.youtube.com/'),true);
+ assert.equal(protectedMediaAllowed('ytmusic','mediaKeySystem','http://music.youtube.com/'),false);
+ assert.equal(protectedMediaAllowed('ytmusic','mediaKeySystem','https://music.youtube.com.evil.test/'),false);
+ assert.equal(protectedMediaAllowed('discord','mediaKeySystem','https://music.youtube.com/'),false);
+ assert.equal(protectedMediaAllowed('ytmusic','media','https://music.youtube.com/'),false);
 });

@@ -13,6 +13,6 @@ test('never blocks pages the user navigates to',()=>{
 });
 test('bundled list loads and leaves the services themselves alone',()=>{
  const list=loadHosts();assert.ok(list.size>1000);
- for(const h of ['web.whatsapp.com','web.telegram.org','discord.com','www.threads.com','teams.microsoft.com','login.microsoftonline.com','open.spotify.com','t.co','www.gstatic.com'])assert.equal(hostBlocked(h,list),false,h);
+ for(const h of ['web.whatsapp.com','web.telegram.org','discord.com','www.threads.com','teams.microsoft.com','login.microsoftonline.com','music.youtube.com','accounts.google.com','rr1---sn-abc.googlevideo.com','t.co','www.gstatic.com'])assert.equal(hostBlocked(h,list),false,h);
  assert.equal(hostBlocked('pagead2.googlesyndication.com',list),true);
 });

@@ -135,7 +135,7 @@ function make(s){
   setTimeout(()=>{if(quitting||views.has(s.id))return;if(wasActive&&active===null)select(s.id);else{make(s);state()}},2000*recent.length).unref();
  });
  view.setVisible(false);
- const e={view,lastActive:Date.now(),attached:false,visible:false,sleeping:false,callActive:false,callMonitorReady:false};views.set(s.id,e);mountServiceView(win,e);(s.id==='spotify'?widevineReady:Promise.resolve()).then(()=>{if(!wc.isDestroyed())return wc.loadURL(s.url)}).catch(()=>{});return e;
+ const e={view,lastActive:Date.now(),attached:false,visible:false,sleeping:false,callActive:false,callMonitorReady:false};views.set(s.id,e);mountServiceView(win,e);(s.id==='ytmusic'?widevineReady:Promise.resolve()).then(()=>{if(!wc.isDestroyed())return wc.loadURL(s.url)}).catch(()=>{});return e;
 }
 function hideActive(){const e=views.get(active);if(e){e.lastActive=Date.now();hideServiceView(e);syncRenderingPriority()}}
 function select(id){const s=services.find(s=>s.id===id);if(!s)return;if(active===id&&views.get(id)?.visible){const e=views.get(id);e.lastActive=Date.now();setSleeping(id,false).then(focusService);return}hideActive();active=id;const e=views.get(id)||make(s);e.lastActive=Date.now();showServiceView(win,e);syncRenderingPriority();setSleeping(id,false).then(()=>{if(active===id&&!e.view.webContents.isDestroyed())e.view.webContents.focus()});state()}
