@@ -7,7 +7,7 @@ A small Ubuntu desktop home for Discord, WhatsApp, Threads, Teams, Telegram, and
 - Switching services preserves the existing page; no two-service limit.
 - WhatsApp and Telegram never hibernate.
 - Pauses inactive pages after 5 minutes, preserving the renderer, page state, and drafts for fast resume. This retains more memory than closing the page; the main saving is reduced background CPU work.
-- Services paused for a further 30 minutes are closed to return their memory; they reload (with saved login) when opened again. WhatsApp, Telegram, pinned services, open sign-in popups, calls and audio are never closed.
+- Services paused for a further 5 minutes (10 minutes after last use) are closed to return their memory; they reload (with saved login) when opened again. WhatsApp, Telegram, pinned services, open sign-in popups, calls and audio are never closed.
 - Each service's HTTP disk cache is capped at 256 MB.
 - A crashed always-awake, pinned or open service restarts automatically (up to 3 times in 10 minutes).
 - Keep awake opts a service out of sleeping, for notifications and calls.

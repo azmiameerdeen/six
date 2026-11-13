@@ -14,7 +14,7 @@ test('hibernate at five minutes, preserve WhatsApp and Telegram regardless of pi
  assert.deepEqual(sleepCandidates(entries,'teams',hibernateAfter),['discord','threads','ytmusic']);
  assert.deepEqual(sleepCandidates(entries,'teams',hibernateAfter*10),['discord','threads','ytmusic']);
 });
-test('frozen services close after 30 more idle minutes, never always-awake, pinned, audible or active ones',()=>{
+test('frozen services close after 5 more idle minutes, never always-awake, pinned, audible or active ones',()=>{
  const {discardCandidates,discardAfter}=require('./policy');
  const base={sleeping:true,sleptAt:0,keepAlive:false,callActive:false,audible:false};
  const entries=[{id:'threads',...base},{id:'whatsapp',...base},{id:'discord',...base,keepAlive:true},{id:'ytmusic',...base,audible:true},{id:'teams',...base,callActive:true},{id:'x',...base,sleeping:false},{id:'active',...base}];

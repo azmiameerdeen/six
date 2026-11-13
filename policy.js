@@ -8,7 +8,7 @@ services.sort((a,b)=>order.indexOf(a.id)-order.indexOf(b.id));
 const startupServices=services.filter(s=>alwaysAwake.has(s.id));
 function sleepCandidates(entries,active,now,delay=hibernateAfter){return entries.filter(e=>e.id!==active&&!alwaysAwake.has(e.id)&&!e.keepAlive&&!e.callActive&&!e.audible&&now-e.lastActive>=delay).map(e=>e.id)}
 // Frozen pages still hold their memory; close them after a longer idle so the RAM is returned.
-const discardAfter=30*60*1000;
+const discardAfter=5*60*1000; // closed 10 minutes after last use (5 to pause + 5 more)
 function discardCandidates(entries,active,now,delay=discardAfter){return entries.filter(e=>e.sleeping&&e.id!==active&&!alwaysAwake.has(e.id)&&!e.keepAlive&&!e.callActive&&!e.audible&&now-(e.sleptAt||0)>=delay).map(e=>e.id)}
 function safeURL(value){try{return ['https:','http:'].includes(new URL(value).protocol)}catch{return false}}
 module.exports={services,startupServices,sleepCandidates,discardCandidates,safeURL,alwaysAwake,hibernateAfter,discardAfter};
