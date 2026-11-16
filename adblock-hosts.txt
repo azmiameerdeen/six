@@ -1,5 +1,5 @@
 # Ad and tracking hosts from Peter Lowe's list (pgl.yoyo.org/adservers), fetched 2026-11-13.
-# Removed: t.co, click.discord.com, measure.office.com, ogads-pa.googleapis.com (used by X links, Discord, Teams, Google account menu).
+# Removed: t.co, click.discord.com, measure.office.com, ogads-pa.googleapis.com, googletagmanager.com, googletagservices.com (used by X links, Discord, Teams, Google account menu and Google sign-in).
 101com.com
 180hits.de
 180searchassistant.com
@@ -1776,8 +1776,6 @@ google-analytics.com
 googleadservices.com
 googleanalytics.com
 googlesyndication.com
-googletagmanager.com
-googletagservices.com
 goqon.com
 gostats.com
 gothamads.com

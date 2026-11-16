@@ -1,5 +1,5 @@
 const {components,desktopCapturer,app,BrowserWindow,WebContentsView,ipcMain,shell,dialog,Tray,Menu,nativeImage,session,clipboard}=require('electron');
-const {notificationsAllowed,audioMuted,browserUserAgent,popupAllowed}=require('./notification-policy');
+const {notificationsAllowed,audioMuted,browserUserAgent,popupAllowed,authUserAgent,isGoogleAuth,sanitizeAuthHeaders}=require('./notification-policy');
 const {teamsMediaAllowed,protectedMediaAllowed}=require('./media-policy');
 const {jumpTelegramLatest}=require('./telegram-latest');
 const {makeScreenShareHandler,sourceLabel}=require('./screen-sharing');
@@ -77,6 +77,10 @@ function configureContents(wc,s,ses){
  wc.on('unresponsive',()=>console.warn('Six: '+s.id+' renderer unresponsive'));
 
  wc.setUserAgent(browserUserAgent(wc.getUserAgent()));
+ wc.on('did-start-navigation',(_event,url)=>{
+  if(isGoogleAuth(url))wc.setUserAgent(authUserAgent);
+  else wc.setUserAgent(browserUserAgent(ses.getUserAgent()));
+ });
  wc.setAudioMuted(audioMuted(settings,s.id));
  wc.setWindowOpenHandler(({url})=>{
   if(popupAllowed(url,wc.getURL()))return {action:'allow',overrideBrowserWindowOptions:{parent:win,autoHideMenuBar:true,webPreferences:{session:ses,preload:preloadFor(s.id),nodeIntegration:false,contextIsolation:true,sandbox:true}}};
@@ -112,6 +116,9 @@ function make(s){
   onPicking:value=>{const e=views.get(s.id);if(e){e.sharePickerOpen=value;if(!value)e.lastActive=Date.now()}}
  }));
  ses.setUserAgent(browserUserAgent(ses.getUserAgent()));
+ ses.webRequest.onBeforeSendHeaders((details,callback)=>{
+  callback({requestHeaders:sanitizeAuthHeaders(details.url,details.requestHeaders)});
+ });
  applyAdblock(ses,settings._adblock!==false,url=>noteBlocked(s.id,url));
  ses.setPermissionCheckHandler((_wc,permission,origin,details)=>{
   if(teamsMediaAllowed(s.id,permission,details?.securityOrigin||origin)||protectedMediaAllowed(s.id,permission,details?.securityOrigin||origin))return true;
