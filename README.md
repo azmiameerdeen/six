@@ -1,5 +1,5 @@
 # Six
-A small Ubuntu desktop home for Discord, WhatsApp, Threads, Teams, Telegram, YouTube Music, and Gemini.
+A small Ubuntu desktop home for Discord, WhatsApp, Threads, Teams, Telegram, and YouTube Music.
 
 ## Resource behavior
 - Loads all six services at startup in staggered intervals, including when starting in the tray.

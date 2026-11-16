@@ -15,7 +15,7 @@ test('browser identifier is consistent across services and sign-in popups',()=>a
 test('Google auth requests use dedicated clean browser user agent without sec-ch-ua client hints',()=>{
  assert.equal(isGoogleAuth('https://accounts.google.com/InteractiveLogin'),true);
  assert.equal(isGoogleAuth('https://accounts.youtube.com/accounts/SetSID'),true);
- assert.equal(isGoogleAuth('https://gemini.google.com/app'),false);
+ assert.equal(isGoogleAuth('https://www.google.com/search'),false);
  const sample={'User-Agent':'Chrome/152','Sec-CH-UA':'Chromium','sec-ch-ua-platform':'Linux','Accept':'*/*'};
  const sanitized=sanitizeAuthHeaders('https://accounts.google.com/v3/signin',sample);
  assert.equal(sanitized['User-Agent'],authUserAgent);

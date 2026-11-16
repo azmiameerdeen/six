@@ -5,6 +5,6 @@ test('scrollbars are hidden everywhere, but sideways scrolling is only locked on
  assert.doesNotMatch(contentStyle,/overflow-x/);
  assert.match(authStyle,/overflow-x:hidden/);
  assert.equal(isGoogleAuth('https://accounts.google.com/v3/signin/identifier'),true);
- assert.equal(isGoogleAuth('https://gemini.google.com/app'),false);
+ assert.equal(isGoogleAuth('https://www.google.com/search'),false);
  assert.equal(isGoogleAuth('https://web.whatsapp.com/'),false);
 });
