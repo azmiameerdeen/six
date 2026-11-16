@@ -5,7 +5,7 @@ const {jumpTelegramLatest}=require('./telegram-latest');
 const {makeScreenShareHandler,sourceLabel}=require('./screen-sharing');
 const {updateRenderingPriority}=require('./rendering-priority');
 const {layoutServiceView,mountServiceView,hideServiceView,showServiceView}=require('./service-views');
-const {contentStyle}=require('./content-style');
+const {contentStyle,authStyle}=require('./content-style');
 const {applyAdblock}=require('./adblock');
 const {contextMenuItems}=require('./context-menu');
 const path=require('node:path'),fs=require('node:fs');
@@ -67,7 +67,7 @@ function refreshControls(){
 function configureContents(wc,s,ses){
  // Website content must never act as window chrome.
  // Insert as soon as the new page commits so the scrollbar never flashes during load; dom-ready is a fallback.
- const addStyle=()=>wc.insertCSS(contentStyle,{cssOrigin:'user'}).catch(()=>{});
+ const addStyle=()=>{wc.insertCSS(contentStyle,{cssOrigin:'user'}).catch(()=>{});if(isGoogleAuth(wc.getURL()))wc.insertCSS(authStyle,{cssOrigin:'user'}).catch(()=>{})};
  wc.on('did-navigate',addStyle);wc.on('dom-ready',addStyle);
  wc.on('context-menu',(_event,params)=>{
   const run={replace:i=>wc.replaceMisspelling(i.word),openLink:()=>external(params.linkURL),copyLink:()=>clipboard.writeText(params.linkURL),copyImage:()=>wc.copyImageAt(params.x,params.y),copyImageURL:()=>clipboard.writeText(params.srcURL),undo:()=>wc.undo(),redo:()=>wc.redo(),cut:()=>wc.cut(),copy:()=>wc.copy(),paste:()=>wc.paste(),pastePlain:()=>wc.pasteAndMatchStyle(),selectAll:()=>wc.selectAll()};
