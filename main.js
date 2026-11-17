@@ -95,6 +95,13 @@ function configureContents(wc,s,ses){
 }
 function make(s){
  const ses=session.fromPartition('persist:six-'+s.id);
+ if(!sessions.has(ses)){
+  // Make persistent ("stay until clicked") notifications auto-hide; once per session, never fatal.
+  try{
+   ses.registerPreloadScript({type:'frame',filePath:path.join(__dirname,'notification-preload.js')});
+   ses.registerPreloadScript({type:'service-worker',filePath:path.join(__dirname,'notification-sw-preload.js')});
+  }catch(err){console.warn('Six: notification auto-hide unavailable',err.message)}
+ }
  sessions.add(ses);
  if(s.id==='teams')ses.setDisplayMediaRequestHandler(makeScreenShareHandler({
   allowed:origin=>teamsMediaAllowed(s.id,'display-capture',origin),

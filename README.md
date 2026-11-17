@@ -47,3 +47,6 @@ Six asks Chromium to decode and encode video on the GPU through VA-API (needs `i
 
 ## YouTube Music ads
 While **Block ads and trackers** is on, the YouTube Music tab removes ad slots from YouTube's player data before playback, so most ads never start; any ad that still appears is muted, run to its end and skipped. Turning the switch off or on takes effect the next time the YouTube Music tab opens (for example after restarting Six). YouTube changes its player often, so this can stop working until it is updated.
+
+## Notifications that stay on screen
+Some sites ask the desktop to keep a notification visible until you click it. Six turns that request off, and also closes such a notification after 5 seconds. Ordinary notifications are not touched. For sites that show notifications from a service worker (for example Telegram), only the "keep visible" request is removed.
