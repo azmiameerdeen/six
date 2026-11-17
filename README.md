@@ -1,52 +1,96 @@
 # Six
-A small Ubuntu desktop home for Discord, WhatsApp, Threads, Teams, Telegram, and YouTube Music.
 
-## Resource behavior
-- Loads all six services at startup in staggered intervals, including when starting in the tray.
-- Services use separate persistent sessions and compact tabs across the top.
-- Switching services preserves the existing page; no two-service limit.
-- WhatsApp and Telegram never hibernate.
-- Pauses inactive pages after 5 minutes, preserving the renderer, page state, and drafts for fast resume. This retains more memory than closing the page; the main saving is reduced background CPU work.
-- Services paused for a further 5 minutes (10 minutes after last use) are closed to return their memory; they reload (with saved login) when opened again. WhatsApp, Telegram, pinned services, open sign-in popups, calls and audio are never closed.
-- Each service's HTTP disk cache is capped at 256 MB.
-- A crashed always-awake, pinned or open service restarts automatically (up to 3 times in 10 minutes).
-- Keep awake opts a service out of sleeping, for notifications and calls.
-- Services playing audio are not put to sleep.
-- Closing the window keeps Six in the tray. Choose Quit Six to exit fully.
-- The memory figure sums Electron process working sets. Shared memory can be counted more than once; it is an estimate, not a guaranteed system footprint.
+Your messaging services in one quiet home. Six is a small Linux desktop app that puts Discord, WhatsApp, Threads, Teams, Telegram and YouTube Music side by side as compact tabs, and keeps them light on memory and CPU.
 
-Sleeping services cannot deliver notifications. Pin services before making calls: silent calls and screen sharing may not register as audio playback. Voice/video, screen sharing, sign-in providers, and unread behavior depend on each service; account-based validation is still required. Teams screen/window sharing opens a source chooser. The confirmation offers Include system audio. Linux output capture and Teams publishing still need an end-to-end meeting test.
+![Six home screen](docs/screenshot.png)
+
+*The home screen, shown with sample data. Services you have not opened yet say "Open your space".*
+
+## Services
+
+| Service | Address | Notes |
+|---|---|---|
+| WhatsApp | web.whatsapp.com | Starts with Six and never sleeps |
+| Telegram | web.telegram.org | Starts with Six and never sleeps; a **Latest ↓** button jumps to the newest messages |
+| Teams | teams.microsoft.com | Microphone, camera and screen sharing for calls |
+| Threads | threads.com | |
+| Discord | discord.com | |
+| YouTube Music | music.youtube.com | Plays protected tracks; ads are removed |
+
+Each service has its own saved login, kept separate from the others.
+
+## Light on resources
+
+- **Starts small.** Only WhatsApp and Telegram load at startup, including when Six starts hidden in the tray. The others load when you open them.
+- **Pauses what you are not using.** A service you have not used for 5 minutes is paused: its page and drafts stay in memory, but background work stops.
+- **Frees memory.** After 5 more minutes (10 in total) a paused service is closed to give its memory back. It reloads when you open it again, and you stay signed in.
+- **Never closed:** WhatsApp, Telegram, services you set to **Keep awake**, services with a sign-in popup open, calls, and anything playing audio.
+- **Capped cache.** Each service's web cache is limited to 256 MB.
+- **Quiet in the tray.** Closing the window keeps Six running in the tray. Six stops refreshing its own screen while hidden.
+- **Hardware video.** Video decoding and encoding run on the graphics chip through VA-API (on Intel, install `intel-media-va-driver`). If video glitches or shows black frames, add `"_hardwareVideo":false` to `~/.config/Six/settings.json` and restart Six.
+- **Self-healing.** If an always-awake, pinned or open service crashes, Six restarts it, up to 3 times in 10 minutes.
+
+The memory figure on the home screen adds up the working sets of all Six processes. Shared memory can be counted more than once, so it is an estimate, not an exact footprint.
+
+## Notifications and sound
+
+- With a service open, **Alerts on/off** controls its desktop notifications, and **Sound on / Muted** controls all of its audio, including call audio.
+- The tray menu has **Pause all notifications**, **Mute all audio** and **Block ads and trackers**. A global setting overrides the per-service one.
+- A paused or closed service cannot deliver notifications. Set a service to **Keep awake** if you need its alerts or calls.
+- Some sites ask for a notification to stay on screen until you click it. Six removes that request and also closes such a notification after 5 seconds. Ordinary notifications are not touched.
+
+## Ads, scrollbars and menus
+
+- **Ad and tracker blocking.** Requests to known ad and tracking servers are blocked using [Peter Lowe's list](https://pgl.yoyo.org/adservers/) (bundled in `adblock-hosts.txt`, about 3,500 hosts). Pages you open are never blocked, only what they load. Switch it off from the tray menu. The hosts blocked for each service are written to `~/.config/Six/adblock-blocked.txt`; if a page breaks, find its host there and remove it from `adblock-hosts.txt`.
+- **YouTube Music ads.** While blocking is on, the YouTube Music tab strips ad slots from YouTube's player data before playback. An ad that still gets through is muted, run to its end and skipped. YouTube changes its player often, so this can stop working until it is updated. Ads that a site serves from its own servers, such as sponsored posts in Threads, are not removed.
+- **Hidden scrollbars.** Scrollbars are hidden everywhere; scrolling with the wheel, touchpad and keyboard still works.
+- **Right-click menu.** Spelling suggestions, open or copy a link, copy an image, and undo, redo, cut, copy, paste, paste as plain text and select all.
+
+## Teams calls
+
+Teams microphone, camera and speaker-selection permissions are allowed automatically on official Teams HTTPS addresses. Teams audio starts unmuted unless global mute is on. Nothing joins a call or switches on your camera by itself.
+
+Screen sharing opens a chooser for the screen or window, with an **Include system audio** option. Linux audio capture and publishing into a Teams meeting still need a full test in a real meeting.
+
+To avoid dropping a call, Six watches only whether a call is active (a yes or no from WebRTC and live media tracks, including muted ones). It does not read, record or send call contents. Teams stays awake during calls and sharing, and for 5 idle minutes after they end.
+
+## YouTube Music and sign-in
+
+Six runs on [castlabs' Electron build](https://github.com/castlabs/electron-releases) (`44.9.3+wvcus`), which includes Widevine, so YouTube Music can play protected tracks. Widevine is only granted to YouTube's HTTPS pages for that tab, and it downloads the first time Six starts.
+
+Google rejects sign-in from many embedded apps. On `accounts.google.com` and `accounts.youtube.com` Six presents a plain browser identity so the sign-in goes through.
 
 ## Security
-Remote service pages use sandboxed renderers, context isolation, web security, and no Node access. Each service has its own stored session. Desktop notifications can be disabled per service or paused globally from the tray; microphone/camera requests ask for approval; other device permissions are denied. Supported authentication domains may open a secure popup. Other HTTP(S) popup links open in the system browser. No credentials are handled by Six itself.
 
-## Development
-Use Node 22.12 or newer. Run `npm install`, `node node_modules/electron/install.js`, `npm test`, then `npm start`.
-Source and installed application are separate. Keep source for further development.
+- Service pages run in sandboxed renderers with context isolation and web security on, and have no Node access.
+- Each service has its own stored session. Six never handles your passwords itself.
+- Camera and microphone requests ask for approval (except on Teams addresses, above). Other device permissions are denied.
+- Sign-in popups from trusted domains open inside Six, in a sandbox that shares the service's session. Other links open in your system browser.
+- Teams and YouTube Music add small page scripts for call status and ad removal, and every service gets one for notifications. They do nothing else.
 
-## Notification and sound controls
-With a service open, use Alerts on/off to enable or disable its desktop notifications, and Sound on/Muted to control all audio from it, including call audio. The tray menu offers Pause all notifications and Mute all audio. Settings persist across restarts. Global settings override individual ones. Sleeping services do not deliver notifications. Authentication popups share the service session and remain sandboxed; a service does not hibernate while its authentication popup remains open.
+## Run it
 
-Teams microphone, camera, and speaker-selection permissions are allowed automatically on official Teams HTTPS origins. Teams audio starts unmuted unless global mute is enabled or you subsequently mute it. Device access is allowed when Teams requests it; this does not automatically join calls or switch on your camera in a meeting. Other services retain their existing prompts.
+Requires Node 22.12 or newer, on Linux (built and used on Ubuntu with GNOME and Wayland).
 
-Teams call protection monitors only boolean WebRTC and live media-track activity, including muted tracks. It does not read, record, or transmit call contents. Teams stays awake during calls or sharing and waits five idle minutes after activity ends. If the activity monitor is unavailable, Teams stays awake as a precaution. 
+```bash
+npm install
+node node_modules/electron/install.js
+npm test      # run the tests
+npm start     # start Six
+```
 
-## YouTube Music
-Six runs on castlabs' Electron build (`44.9.3+wvcus`), which includes Widevine for YouTube Music tracks that need protected playback. Widevine is only granted to YouTube's HTTPS pages. Sign in with your Google account in the tab; Google sign-in popups stay inside Six. YouTube Music pauses after 5 idle minutes like other services, but never while music is playing.
+To install a copy system-wide, `install-update.sh` copies the app into `/opt/six-messenger` and keeps a small rollback copy of the previous files in a `.rollback-<date>` folder. Run it as your normal user; it asks for your password. Start Six from the app menu afterwards.
 
-## Scrollbars and ad blocking
-Scrollbars are hidden in every service and in Six itself; scrolling with the wheel, touchpad and keyboard still works.
-Requests to known ad and tracking servers are blocked using Peter Lowe's list (bundled as `adblock-hosts.txt`, ~3,500 hosts). Pages you open are never blocked, only what they load. Toggle it from the tray menu with **Block ads and trackers**; when off, no request passes through Six's filter at all. This is network blocking only: ads a site serves from its own servers (for example sponsored posts in Threads or YouTube's own video and audio ads) are not removed.
-Hosts blocked for each service are recorded in `~/.config/Six/adblock-blocked.txt`; if a page breaks, check there and remove the host from `adblock-hosts.txt`.
+## What is where
 
-## Right-click menu
-Service pages have a right-click menu: spelling suggestions, open/copy link, copy image, and undo/redo, cut, copy, paste, paste as plain text and select all. Ctrl+C / Ctrl+V / Ctrl+A keep working as usual.
-
-## Hardware video
-Six asks Chromium to decode and encode video on the GPU through VA-API (needs `intel-media-va-driver` on Intel). If calls or videos show glitches or black frames, add `"_hardwareVideo":false` to `~/.config/Six/settings.json` and restart Six.
-
-## YouTube Music ads
-While **Block ads and trackers** is on, the YouTube Music tab removes ad slots from YouTube's player data before playback, so most ads never start; any ad that still appears is muted, run to its end and skipped. Turning the switch off or on takes effect the next time the YouTube Music tab opens (for example after restarting Six). YouTube changes its player often, so this can stop working until it is updated.
-
-## Notifications that stay on screen
-Some sites ask the desktop to keep a notification visible until you click it. Six turns that request off, and also closes such a notification after 5 seconds. Ordinary notifications are not touched. For sites that show notifications from a service worker (for example Telegram), only the "keep visible" request is removed.
+| File | Purpose |
+|---|---|
+| `main.js` | App window, tray, service views, sleeping and closing, permissions |
+| `policy.js` | The service list and the sleep and close rules |
+| `adblock.js`, `adblock-hosts.txt` | Ad and tracker blocking |
+| `notification-policy.js` | Notification, audio and popup rules, Google sign-in identity |
+| `notification-preload.js`, `notification-sw-preload.js` | Auto-hide for notifications that stay on screen |
+| `teams-call-preload.js`, `screen-sharing.js`, `media-policy.js` | Teams calls and screen sharing, Widevine for YouTube |
+| `ytmusic-preload.js` | YouTube Music ad removal |
+| `context-menu.js`, `content-style.js` | Right-click menu and page styling |
+| `*.test.js` | Tests, run with `npm test` |
