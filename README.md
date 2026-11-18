@@ -57,7 +57,7 @@ To avoid dropping a call, Six watches only whether a call is active (a yes or no
 
 ## YouTube Music and sign-in
 
-Six runs on [castlabs' Electron build](https://github.com/castlabs/electron-releases) (`44.9.3+wvcus`), which includes Widevine, so YouTube Music can play protected tracks. Widevine is only granted to YouTube's HTTPS pages for that tab, and it downloads the first time Six starts.
+Six runs on [castlabs' Electron build](https://github.com/castlabs/electron-releases) (`44.10.1+wvcus`), which includes Widevine, so YouTube Music can play protected tracks. Widevine is only granted to YouTube's HTTPS pages for that tab, and it downloads the first time Six starts.
 
 Google rejects sign-in from many embedded apps. On `accounts.google.com` and `accounts.youtube.com` Six presents a plain browser identity so the sign-in goes through.
 
