@@ -24,13 +24,19 @@ for f in *.js *.html *.css *.txt package.json README.md; do
   sudo install -m 0644 "$f" "$DST/$f"
 done
 sudo install -m 0644 icons/* "$DST/icons/"
+sudo install -m 0755 -o root -g root update-electron.sh "$DST/update-electron.sh"  # run by Six through pkexec
 
-if ! cmp -s "$SRC/node_modules/electron/dist/version" "$DST/node_modules/electron/dist/version"; then
-  echo "Updating Electron to $(cat "$SRC/node_modules/electron/dist/version")…"
+# Only ever move Electron forward: Six may already have updated itself past the copy in this folder.
+src_v="$(cut -d+ -f1 "$SRC/node_modules/electron/dist/version")"
+dst_v="$(cut -d+ -f1 "$DST/node_modules/electron/dist/version")"
+if [ "$src_v" != "$dst_v" ] && [ "$(printf '%s\n%s\n' "$dst_v" "$src_v" | sort -V | tail -n1)" = "$src_v" ]; then
+  echo "Updating Electron $dst_v to $src_v…"
   sudo mv "$DST/node_modules/electron/dist" "$RB/electron-dist"
   sudo cp -a "$SRC/node_modules/electron/dist" "$DST/node_modules/electron/dist"
   sudo chown -R root:root "$DST/node_modules/electron/dist"
   sudo chmod 4755 "$DST/node_modules/electron/dist/chrome-sandbox"
+elif [ "$src_v" != "$dst_v" ]; then
+  echo "Keeping Electron $dst_v (newer than the $src_v in this folder)."
 fi
 
 echo "Done. Now start Six from the app menu. Rollback copy: $RB"

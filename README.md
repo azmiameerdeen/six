@@ -61,6 +61,18 @@ Six runs on [castlabs' Electron build](https://github.com/castlabs/electron-rele
 
 Google rejects sign-in from many embedded apps. On `accounts.google.com` and `accounts.youtube.com` Six presents a plain browser identity so the sign-in goes through.
 
+## Electron updates
+
+Six runs on Electron, which is also the browser engine, so it needs regular security updates. Each time Six opens it checks, about a minute after start, whether castlabs has published a newer build in the same major version (for example 44.x). Nothing is installed without you:
+
+- If one exists, Six asks (or, if it is hidden in the tray, shows a notification and a tray item **Update Electron to X…**).
+- **Update now** asks for your password through the system prompt, downloads the build from castlabs' GitHub release, checks it against the SHA-256 that GitHub publishes for it, swaps it in and restarts Six.
+- The previous Electron is kept in `/opt/six-messenger/.electron-previous`. To go back: `pkexec /opt/six-messenger/update-electron.sh rollback`.
+- New major versions (45 and up) are never offered automatically.
+- To turn the check off, add `"_electronUpdateCheck":false` to `~/.config/Six/settings.json`. The check sends one request to GitHub's public API and nothing else.
+
+This only works in the installed copy (`/opt/six-messenger`); `install-update.sh` puts the update script there.
+
 ## Security
 
 - Service pages run in sandboxed renderers with context isolation and web security on, and have no Node access.
@@ -93,5 +105,6 @@ To install a copy system-wide, `install-update.sh` copies the app into `/opt/six
 | `notification-preload.js`, `notification-sw-preload.js` | Auto-hide for notifications that stay on screen |
 | `teams-call-preload.js`, `screen-sharing.js`, `media-policy.js` | Teams calls and screen sharing, Widevine for YouTube |
 | `ytmusic-preload.js` | YouTube Music ad removal |
+| `electron-update.js`, `update-electron.sh` | Checks for newer Electron builds and installs them after you approve |
 | `context-menu.js`, `content-style.js` | Right-click menu and page styling |
 | `*.test.js` | Tests, run with `npm test` |

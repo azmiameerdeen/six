@@ -1,4 +1,6 @@
-const {components,desktopCapturer,app,BrowserWindow,WebContentsView,ipcMain,shell,dialog,Tray,Menu,nativeImage,session,clipboard}=require('electron');
+const {components,desktopCapturer,app,BrowserWindow,WebContentsView,ipcMain,shell,dialog,Tray,Menu,nativeImage,session,clipboard,Notification}=require('electron');
+const {execFile}=require('node:child_process');
+const {checkForUpdate}=require('./electron-update');
 const {notificationsAllowed,audioMuted,browserUserAgent,popupAllowed,authUserAgent,isGoogleAuth,sanitizeAuthHeaders}=require('./notification-policy');
 const {teamsMediaAllowed,protectedMediaAllowed}=require('./media-policy');
 const {jumpTelegramLatest}=require('./telegram-latest');
@@ -20,7 +22,7 @@ if(hardwareVideo)app.commandLine.appendSwitch('enable-features','AcceleratedVide
 // castlabs Electron ships Widevine through a component updater; stock Electron has no `components`.
 const widevineReady=app.whenReady().then(()=>components?.whenReady()).catch(err=>console.warn('Six: Widevine unavailable',err));
 if(!app.requestSingleInstanceLock()){app.quit()}else{
-let win,tray,active=null,quitting=false,settings={},shutdownFlushing=false,shutdownSaved=false,sessions=new Set(),views=new Map(),popups=new Map(),crashes=new Map();
+let win,tray,updateInfo=null,updating=false,active=null,quitting=false,settings={},shutdownFlushing=false,shutdownSaved=false,sessions=new Set(),views=new Map(),popups=new Map(),crashes=new Map();
 // Write then rename, so a crash or power loss mid-save cannot leave a half-written settings file.
 function save(){const file=path.join(app.getPath('userData'),'settings.json');try{fs.writeFileSync(file+'.tmp',JSON.stringify(settings));fs.renameSync(file+'.tmp',file)}catch(err){console.warn('Six: could not save settings',err.message)}}
 let memorySample={at:0,value:0};
@@ -54,6 +56,43 @@ function noteBlocked(id,url){let host;try{host=new URL(url).hostname}catch{retur
 function preloadFor(id){if(id==='teams')return path.join(__dirname,'teams-call-preload.js');if(id==='ytmusic'&&settings._adblock!==false)return path.join(__dirname,'ytmusic-preload.js')}
 function external(url){if(safeURL(url))shell.openExternal(url)}
 function focusService(){const e=views.get(active);if(e&&!e.view.webContents.isDestroyed())e.view.webContents.focus()}
+// Electron updates: checked each time Six opens, installed only after you approve and enter your password.
+// Same major version only; the root-owned update-electron.sh does the download, checksum check and swap.
+const UPDATER='/opt/six-messenger/update-electron.sh';
+const electronVersion=process.versions.electron;
+const updaterAvailable=()=>app.getAppPath()==='/opt/six-messenger'&&fs.existsSync(UPDATER);
+async function checkElectronUpdate(){
+ if(quitting||settings._electronUpdateCheck===false||!updaterAvailable())return;
+ try{
+  const found=await checkForUpdate(electronVersion);
+  if(!found||quitting)return;
+  updateInfo=found;refreshControls();
+  if(settings._electronSkip!==found.version)offerElectronUpdate();
+ }catch{} // offline or rate-limited: try again next time Six opens
+}
+async function offerElectronUpdate(){
+ if(!updateInfo||updating)return;
+ if(!win||win.isDestroyed()||!win.isVisible()){
+  new Notification({title:'Six: Electron update available',body:'Electron '+updateInfo.version+' is ready to install. Use the Six tray menu to update.'}).show();
+  return;
+ }
+ const {response}=await dialog.showMessageBox(win,{type:'info',title:'Electron update',message:'Electron '+updateInfo.version+' is available',detail:'You have '+electronVersion.split('+')[0]+'. Updating asks for your password, downloads and checks the new version, then restarts Six. Only updates within version '+electronVersion.split('.')[0]+' are offered.',buttons:['Update now','Later','Skip this version'],defaultId:0,cancelId:1});
+ if(response===0)installElectronUpdate();
+ else if(response===2){settings._electronSkip=updateInfo.version;save()}
+}
+function installElectronUpdate(){
+ if(!updateInfo||updating)return;
+ updating=true;refreshControls();
+ const version=updateInfo.version;
+ new Notification({title:'Updating Electron',body:'Downloading '+version+'. Six restarts when it is done.'}).show();
+ execFile('pkexec',[UPDATER,version],{timeout:20*60*1000},(err,_out,stderr)=>{
+  updating=false;
+  if(!err){quitting=true;app.relaunch();app.quit();return}
+  refreshControls();
+  if(err.code===126||err.code===127)return; // password prompt dismissed
+  dialog.showMessageBox(win&&!win.isDestroyed()?win:undefined,{type:'error',title:'Electron update failed',message:'Electron '+version+' was not installed',detail:String(stderr||err.message).slice(-600)+'\n\nSix keeps running on '+electronVersion.split('+')[0]+'.'}).catch(()=>{});
+ });
+}
 function refreshControls(){
  for(const [id,e] of views)e.view.webContents.setAudioMuted(audioMuted(settings,id));
  for(const [popup,id] of popups)if(!popup.isDestroyed())popup.webContents.setAudioMuted(audioMuted(settings,id));
@@ -62,6 +101,7 @@ function refreshControls(){
  {label:'Pause all notifications',type:'checkbox',checked:!!settings._quiet,click:()=>{settings._quiet=!settings._quiet;save();refreshControls();state()}},
  {label:'Mute all audio',type:'checkbox',checked:!!settings._muteAll,click:()=>{settings._muteAll=!settings._muteAll;save();refreshControls();state()}},
  {label:'Block ads and trackers',type:'checkbox',checked:settings._adblock!==false,click:()=>{settings._adblock=settings._adblock===false;save();for(const s of services)if(views.has(s.id)||sessions.has(session.fromPartition('persist:six-'+s.id)))applyAdblock(session.fromPartition('persist:six-'+s.id),settings._adblock,url=>noteBlocked(s.id,url));refreshControls()}},
+ ...(updaterAvailable()?[updateInfo?{label:'Update Electron to '+updateInfo.version+'…',enabled:!updating,click:installElectronUpdate}:{label:'Electron '+electronVersion.split('+')[0],enabled:false}]:[]),
  {type:'separator'},{label:'Quit Six',click:()=>{quitting=true;app.quit()}}]));
 }
 function configureContents(wc,s,ses){
@@ -163,6 +203,7 @@ app.whenReady().then(()=>{
  win.setMenuBarVisibility(false);win.loadFile('index.html');win.on('resize',layout);win.on('focus',focusService);for(const event of ['show','hide','minimize','restore'])win.on(event,syncRenderingPriority);win.on('show',state);win.webContents.on('did-finish-load',state);
  win.webContents.once('did-finish-load',()=>{
   select(startupServices[0].id);
+  setTimeout(checkElectronUpdate,60000).unref(); // once Six has settled
   startupServices.slice(1).forEach((s,i)=>setTimeout(()=>{if(!quitting&&!views.has(s.id)){make(s);state()}},(i+1)*800).unref());
  });
  win.on('close',e=>{if(!quitting){e.preventDefault();win.hide()}});
