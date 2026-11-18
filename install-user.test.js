@@ -36,3 +36,11 @@ test('refuses to run without the AppArmor rule',()=>{
  const t=setup();const r=spawnSync('bash',[path.join(t.src,'install-user.sh')],{env:{...process.env,HOME:t.home,SIX_SKIP_APPARMOR_CHECK:''},encoding:'utf8'});
  if(!fs.existsSync('/etc/apparmor.d/six-electron')){assert.notEqual(r.status,0);assert.match(r.stderr,/setup-apparmor/)}
 });
+test('on a fresh machine --switch creates the app-menu entry, and does not create an autostart one',()=>{
+ const t=setup();fs.rmSync(t.menu);fs.rmSync(t.auto);
+ const r=t.run('--switch');assert.equal(r.status,0,r.stderr);
+ const menu=fs.readFileSync(t.menu,'utf8');
+ assert.match(menu,new RegExp('Exec='+path.join(t.home,'.local/bin/six')+'\n'));assert.match(menu,/Name=Six/);assert.match(menu,/StartupWMClass=six-messenger/);
+ assert.equal(fs.existsSync(t.menu+'.opt-backup'),false);assert.equal(fs.existsSync(t.auto),false);
+ assert.equal(t.run('--revert').status,0);
+});

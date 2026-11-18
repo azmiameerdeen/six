@@ -57,9 +57,28 @@ To avoid dropping a call, Six watches only whether a call is active (a yes or no
 
 ## YouTube Music and sign-in
 
-Six runs on [castlabs' Electron build](https://github.com/castlabs/electron-releases) (`44.10.1+wvcus`), which includes Widevine, so YouTube Music can play protected tracks. Widevine is only granted to YouTube's HTTPS pages for that tab, and it downloads the first time Six starts.
+Six runs on [castlabs' Electron build](https://github.com/castlabs/electron-releases) (the `+wvcus` releases), which includes Widevine, so YouTube Music can play protected tracks. Widevine is only granted to YouTube's HTTPS pages for that tab, and it downloads the first time Six starts.
 
 Google rejects sign-in from many embedded apps. On `accounts.google.com` and `accounts.youtube.com` Six presents a plain browser identity so the sign-in goes through.
+
+## Install
+
+Requires Linux (built and used on Ubuntu with GNOME and Wayland) and Node 22.12 or newer.
+
+**For daily use (recommended).** This puts Six in your home folder, where it can update its own Electron:
+
+```bash
+npm install
+node node_modules/electron/install.js
+sudo ./setup-apparmor.sh      # one time: lets Six's Electron use Chromium's sandbox (see "Electron updates")
+./install-user.sh --switch    # copies Six, Electron and the launcher, and adds or updates the app-menu entry
+```
+
+Then start Six from the app menu. Quit it from the tray first if an older copy is running, because two copies cannot share the same settings. `./install-user.sh` without `--switch` installs but leaves the menu alone, and `./install-user.sh --revert` points the menu and autostart back at a `/opt` copy.
+
+**System-wide instead.** `install-update.sh` copies the app into `/opt/six-messenger` and keeps a small rollback copy of the previous files in a `.rollback-<date>` folder. Run it as your normal user; it asks for your password. This copy cannot update its own Electron without your password (see below).
+
+**For development.** `npm test` runs the tests and `npm start` starts Six straight from this folder.
 
 ## Electron updates
 
@@ -72,16 +91,9 @@ Six runs on Electron, which is also the browser engine, so it needs regular secu
 - If the new Electron crashes before Six has been running for 20 seconds, the launcher puts the previous one back, starts that instead, and remembers the bad version so it is not tried again.
 - The build in use and the one before it are kept; older ones are removed.
 
-Set it up once:
+Set it up as described under **Install** above. The AppArmor rule it asks for is the same kind Ubuntu ships for Discord, Chrome and Brave: it only lets Electron under `~/.local/share/six/electron/` use user namespaces, which Chromium's sandbox needs, and restricts nothing else.
 
-```bash
-sudo ./setup-apparmor.sh      # one-time AppArmor rule that lets Six's Electron use Chromium's sandbox
-./install-user.sh --switch    # copy Six, Electron and the launcher; point the app menu and autostart at it
-```
-
-The rule is the same kind Ubuntu ships for Discord, Chrome and Brave: it only lets Electron under `~/.local/share/six/electron/` use user namespaces, and restricts nothing else. `./install-user.sh --revert` points the menu and autostart back at the `/opt` copy.
-
-**/opt install: one click.** The root-owned copy cannot update itself. Six shows a dialog (or a notification and tray item when hidden); **Update now** asks for your password and `update-electron.sh` downloads, verifies and swaps in the build, keeping the previous one in `/opt/six-messenger/.electron-previous` (undo with `pkexec /opt/six-messenger/update-electron.sh rollback`).
+**System-wide (`/opt`) install: one click.** The root-owned copy cannot update itself. Six shows a dialog (or a notification and tray item when hidden); **Update now** asks for your password and `update-electron.sh` downloads, verifies and swaps in the build, keeping the previous one in `/opt/six-messenger/.electron-previous` (undo with `pkexec /opt/six-messenger/update-electron.sh rollback`).
 
 To turn the check off, add `"_electronUpdateCheck":false` to `~/.config/Six/settings.json`. The check sends one request to GitHub's public API and nothing else.
 
@@ -92,19 +104,6 @@ To turn the check off, add `"_electronUpdateCheck":false` to `~/.config/Six/sett
 - Camera and microphone requests ask for approval (except on Teams addresses, above). Other device permissions are denied.
 - Sign-in popups from trusted domains open inside Six, in a sandbox that shares the service's session. Other links open in your system browser.
 - Teams and YouTube Music add small page scripts for call status and ad removal, and every service gets one for notifications. They do nothing else.
-
-## Run it
-
-Requires Node 22.12 or newer, on Linux (built and used on Ubuntu with GNOME and Wayland).
-
-```bash
-npm install
-node node_modules/electron/install.js
-npm test      # run the tests
-npm start     # start Six
-```
-
-To install it for yourself (recommended, see above), use `install-user.sh`. To install a copy system-wide instead, `install-update.sh` copies the app into `/opt/six-messenger` and keeps a small rollback copy of the previous files in a `.rollback-<date>` folder. Run it as your normal user; it asks for your password. Start Six from the app menu afterwards.
 
 ## What is where
 
@@ -121,4 +120,6 @@ To install it for yourself (recommended, see above), use `install-user.sh`. To i
 | `install-user.sh`, `setup-apparmor.sh` | User install and its one-time AppArmor rule |
 | `update-electron.sh`, `install-update.sh` | The `/opt` install: one-click Electron update, and the copy-into-`/opt` installer |
 | `context-menu.js`, `content-style.js` | Right-click menu and page styling |
+| `index.html`, `renderer.js`, `preload.js`, `style.css` | Six's own window: the tab bar and home screen |
+| `service-views.js`, `rendering-priority.js`, `telegram-latest.js` | Showing and hiding service pages, background throttling, the Telegram **Latest** button |
 | `*.test.js` | Tests, run with `npm test` |

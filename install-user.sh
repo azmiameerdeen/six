@@ -11,13 +11,28 @@ EL="$BASE/electron"
 BIN="$HOME/.local/bin"
 MENU="$HOME/.local/share/applications/six-messenger.desktop"
 AUTO="$HOME/.config/autostart/six-messenger.desktop"
-OPT_EXEC="/opt/six-messenger/node_modules/electron/dist/electron /opt/six-messenger"
 mode="${1:-}"
 
 point_entries(){  # $1 = exec for the menu entry, $2 = icon
+  if [ ! -f "$MENU" ]; then
+    mkdir -p "$(dirname "$MENU")"
+    cat > "$MENU" <<DESKTOP
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Six
+Comment=Your messaging services in one quiet home
+Exec=$1
+Icon=$2
+Terminal=false
+Categories=Network;InstantMessaging;
+StartupWMClass=six-messenger
+DESKTOP
+    NEW_MENU=1
+  fi
   for f in "$MENU" "$AUTO"; do
     [ -f "$f" ] || continue
-    [ -f "$f.opt-backup" ] || cp -p "$f" "$f.opt-backup"
+    [ -n "${NEW_MENU:-}" ] && [ "$f" = "$MENU" ] || { [ -f "$f.opt-backup" ] || cp -p "$f" "$f.opt-backup"; }
     extra=""; [ "$f" = "$AUTO" ] && extra=" --start-hidden"
     sed -i -E "s|^Exec=.*|Exec=$1$extra|; s|^Icon=.*|Icon=$2|" "$f"
   done
