@@ -1,6 +1,8 @@
 const {components,desktopCapturer,app,BrowserWindow,WebContentsView,ipcMain,shell,dialog,Tray,Menu,nativeImage,session,clipboard,Notification}=require('electron');
 const {execFile}=require('node:child_process');
 const {checkForUpdate}=require('./electron-update');
+const {stageUpdate,pruneOldVersions,readBad}=require('./self-update');
+const os=require('node:os');
 const {notificationsAllowed,audioMuted,browserUserAgent,popupAllowed,authUserAgent,isGoogleAuth,sanitizeAuthHeaders}=require('./notification-policy');
 const {teamsMediaAllowed,protectedMediaAllowed}=require('./media-policy');
 const {jumpTelegramLatest}=require('./telegram-latest');
@@ -56,20 +58,45 @@ function noteBlocked(id,url){let host;try{host=new URL(url).hostname}catch{retur
 function preloadFor(id){if(id==='teams')return path.join(__dirname,'teams-call-preload.js');if(id==='ytmusic'&&settings._adblock!==false)return path.join(__dirname,'ytmusic-preload.js')}
 function external(url){if(safeURL(url))shell.openExternal(url)}
 function focusService(){const e=views.get(active);if(e&&!e.view.webContents.isDestroyed())e.view.webContents.focus()}
-// Electron updates: checked each time Six opens, installed only after you approve and enter your password.
-// Same major version only; the root-owned update-electron.sh does the download, checksum check and swap.
-const UPDATER='/opt/six-messenger/update-electron.sh';
+// Electron updates, checked a minute after Six opens and then daily. Six can be installed two ways:
+//  - user install (~/.local/share/six): a newer same-major build is downloaded, checked and staged on its
+//    own; the launcher switches to it at the next start and rolls back if it fails (six-launcher.sh).
+//  - /opt install: asks first, then pkexec runs the root-owned update-electron.sh.
+const USER_BASE=path.join(os.homedir(),'.local','share','six');
+const USER_ELECTRON=path.join(USER_BASE,'electron');
+const USER_LAUNCHER=path.join(os.homedir(),'.local','bin','six');
+const OPT_UPDATER='/opt/six-messenger/update-electron.sh';
 const electronVersion=process.versions.electron;
-const updaterAvailable=()=>app.getAppPath()==='/opt/six-messenger'&&fs.existsSync(UPDATER);
-async function checkElectronUpdate(){
- if(quitting||settings._electronUpdateCheck===false||!updaterAvailable())return;
- try{
-  const found=await checkForUpdate(electronVersion);
-  if(!found||quitting)return;
-  updateInfo=found;refreshControls();
-  if(settings._electronSkip!==found.version)offerElectronUpdate();
- }catch{} // offline or rate-limited: try again next time Six opens
+const userInstall=()=>app.getAppPath()===path.join(USER_BASE,'app');
+const optInstall=()=>app.getAppPath()==='/opt/six-messenger'&&fs.existsSync(OPT_UPDATER);
+let stagedElectron=null;
+function electronMenuItems(){
+ const plain={label:'Electron '+electronVersion.split('+')[0],enabled:false};
+ if(userInstall())return [stagedElectron?{label:'Restart Six to use Electron '+stagedElectron,click:restartSix}:plain];
+ if(optInstall())return [updateInfo?{label:'Update Electron to '+updateInfo.version+'…',enabled:!updating,click:installElectronUpdate}:plain];
+ return [];
 }
+function restartSix(){quitting=true;app.relaunch({execPath:USER_LAUNCHER,args:process.argv.slice(2)});app.quit()}
+async function checkElectronUpdate(){
+ if(quitting||settings._electronUpdateCheck===false)return;
+ try{
+  if(userInstall()){
+   const found=await checkForUpdate(electronVersion,fetch,readBad(USER_ELECTRON));
+   if(!found||quitting)return;
+   const fresh=await stageUpdate({electronDir:USER_ELECTRON,update:found});
+   pruneOldVersions(USER_ELECTRON);
+   stagedElectron=found.version;refreshControls();
+   if(fresh)new Notification({title:'Six: Electron '+found.version+' installed',body:'Six will use it the next time it starts. Use the tray menu to restart now.'}).show();
+  }else if(optInstall()){
+   const found=await checkForUpdate(electronVersion);
+   if(!found||quitting)return;
+   updateInfo=found;refreshControls();
+   if(settings._electronSkip!==found.version)offerElectronUpdate();
+  }
+ }catch(err){console.warn('Six: Electron update check failed:',err.message)} // offline or rate-limited: tried again later
+}
+// Once Six has run for a while, the new Electron is proven; the launcher would otherwise roll it back after a crash.
+function confirmElectronTrial(){if(userInstall())try{fs.rmSync(path.join(USER_ELECTRON,'trial'),{force:true})}catch{}}
 async function offerElectronUpdate(){
  if(!updateInfo||updating)return;
  if(!win||win.isDestroyed()||!win.isVisible()){
@@ -85,7 +112,7 @@ function installElectronUpdate(){
  updating=true;refreshControls();
  const version=updateInfo.version;
  new Notification({title:'Updating Electron',body:'Downloading '+version+'. Six restarts when it is done.'}).show();
- execFile('pkexec',[UPDATER,version],{timeout:20*60*1000},(err,_out,stderr)=>{
+ execFile('pkexec',[OPT_UPDATER,version],{timeout:20*60*1000},(err,_out,stderr)=>{
   updating=false;
   if(!err){quitting=true;app.relaunch();app.quit();return}
   refreshControls();
@@ -101,7 +128,7 @@ function refreshControls(){
  {label:'Pause all notifications',type:'checkbox',checked:!!settings._quiet,click:()=>{settings._quiet=!settings._quiet;save();refreshControls();state()}},
  {label:'Mute all audio',type:'checkbox',checked:!!settings._muteAll,click:()=>{settings._muteAll=!settings._muteAll;save();refreshControls();state()}},
  {label:'Block ads and trackers',type:'checkbox',checked:settings._adblock!==false,click:()=>{settings._adblock=settings._adblock===false;save();for(const s of services)if(views.has(s.id)||sessions.has(session.fromPartition('persist:six-'+s.id)))applyAdblock(session.fromPartition('persist:six-'+s.id),settings._adblock,url=>noteBlocked(s.id,url));refreshControls()}},
- ...(updaterAvailable()?[updateInfo?{label:'Update Electron to '+updateInfo.version+'…',enabled:!updating,click:installElectronUpdate}:{label:'Electron '+electronVersion.split('+')[0],enabled:false}]:[]),
+ ...electronMenuItems(),
  {type:'separator'},{label:'Quit Six',click:()=>{quitting=true;app.quit()}}]));
 }
 function configureContents(wc,s,ses){
@@ -204,6 +231,8 @@ app.whenReady().then(()=>{
  win.webContents.once('did-finish-load',()=>{
   select(startupServices[0].id);
   setTimeout(checkElectronUpdate,60000).unref(); // once Six has settled
+  setInterval(checkElectronUpdate,24*60*60*1000).unref();
+  setTimeout(confirmElectronTrial,20000).unref();
   startupServices.slice(1).forEach((s,i)=>setTimeout(()=>{if(!quitting&&!views.has(s.id)){make(s);state()}},(i+1)*800).unref());
  });
  win.on('close',e=>{if(!quitting){e.preventDefault();win.hide()}});
