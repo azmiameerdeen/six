@@ -3,7 +3,7 @@ const iconTypes={whatsapp:'webp',telegram:'png',teams:'ico',threads:'ico',discor
 services.forEach(s=>s.icon='icons/'+s.id+'.'+iconTypes[s.id]);
 const alwaysAwake=new Set(['whatsapp','telegram']);
 const hibernateAfter=5*60*1000;
-const order=['whatsapp','telegram','teams','threads','discord','ytmusic','instagram'];
+const order=['whatsapp','telegram','teams','threads','instagram','discord','ytmusic'];
 services.sort((a,b)=>order.indexOf(a.id)-order.indexOf(b.id));
 const startupServices=services.filter(s=>alwaysAwake.has(s.id));
 function sleepCandidates(entries,active,now,delay=hibernateAfter){return entries.filter(e=>e.id!==active&&!alwaysAwake.has(e.id)&&!e.keepAlive&&!e.callActive&&!e.audible&&now-e.lastActive>=delay).map(e=>e.id)}

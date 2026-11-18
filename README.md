@@ -14,8 +14,8 @@ Your messaging services in one quiet home. Six is a small Linux desktop app that
 | Telegram | web.telegram.org | Starts with Six and never sleeps; a **Latest ↓** button jumps to the newest messages |
 | Teams | teams.microsoft.com | Microphone, camera and screen sharing for calls |
 | Threads | threads.com | |
-| Discord | discord.com | |
 | Instagram | instagram.com | |
+| Discord | discord.com | |
 | YouTube Music | music.youtube.com | Plays protected tracks; ads are removed |
 
 Each service has its own saved login, kept separate from the others.
