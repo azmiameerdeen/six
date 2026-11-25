@@ -1,6 +1,6 @@
 # Six
 
-Your messaging services in one quiet home. Six is a small Linux desktop app that puts Discord, WhatsApp, Threads, Instagram, Teams, Telegram and YouTube Music side by side as compact tabs, and keeps them light on memory and CPU.
+Your messaging services in one quiet home. Six is a small Linux desktop app that puts Discord, WhatsApp, Threads, Instagram, Teams, Telegram, YouTube Music and Duck.ai side by side as compact tabs, and keeps them light on memory and CPU.
 
 ![Six home screen](docs/screenshot.png)
 
@@ -17,6 +17,7 @@ Your messaging services in one quiet home. Six is a small Linux desktop app that
 | Instagram | instagram.com | |
 | Discord | discord.com | |
 | YouTube Music | music.youtube.com | Plays protected tracks; ads are removed |
+| Duck.ai | duck.ai | DuckDuckGo's AI chat |
 
 Each service has its own saved login, kept separate from the others.
 
