@@ -1,4 +1,4 @@
-const {contextBridge}=require('electron');
+const {contextBridge,ipcRenderer}=require('electron');
 // YouTube Music ad removal. Runs in the page before YouTube's own scripts:
 // 1. removes ad slots from player data so most ads are never scheduled;
 // 2. if an ad still plays, it is muted, run to its end and skipped.
@@ -33,7 +33,35 @@ function ytAdShield(){
  },500);
  return strip;
 }
-if(typeof location!=='undefined'&&location.protocol==='https:'&&['music.youtube.com','www.youtube.com','youtube.com'].includes(location.hostname)){
- contextBridge.executeInMainWorld({func:ytAdShield});
+// Records why playback stops, to Six's local diagnostics log (never sent anywhere), and answers YouTube
+// Music's "Continue watching?" prompt, which pauses music until it is clicked.
+function ytDiagnostics(){
+ const send=line=>{try{window.__sixDiag.log(line)}catch{}};
+ const log=(what,extra)=>send(JSON.stringify({what,vis:document.visibilityState,...extra}));
+ let lastInput=0;
+ for(const type of ['pointerdown','keydown','wheel'])document.addEventListener(type,()=>{lastInput=Date.now()},true);
+ const snapshot=el=>({time:Math.round(el.currentTime||0),of:Math.round(el.duration)||0,ended:!!el.ended,ready:el.readyState,muted:!!el.muted,ad:!!document.querySelector('.ad-showing'),
+  youThere:!!document.querySelector('ytmusic-you-there-renderer'),byUser:Date.now()-lastInput<1500});
+ for(const type of ['pause','ended','error','stalled'])
+  document.addEventListener(type,e=>{if(typeof HTMLMediaElement!=='undefined'&&e.target instanceof HTMLMediaElement)log(type,snapshot(e.target))},true);
+ // Pauses asked for from outside the page: media keys, a headset, the desktop's media controls.
+ const session=typeof navigator!=='undefined'&&navigator.mediaSession;
+ if(session&&typeof session.setActionHandler==='function'){
+  const original=session.setActionHandler.bind(session);
+  session.setActionHandler=(action,handler)=>original(action,action==='pause'&&typeof handler==='function'?function(...args){log('media control asked to pause',{});return handler.apply(this,args)}:handler);
+ }
+ let answered=false;
+ if(typeof setInterval!=='undefined')setInterval(()=>{
+  const prompt=document.querySelector('ytmusic-you-there-renderer');
+  if(!prompt){answered=false;return}
+  const yes=[...prompt.querySelectorAll('button,[role=button]')].find(b=>/yes|continue/i.test(b.textContent||b.getAttribute('aria-label')||''));
+  if(!answered){answered=true;log(yes?'answered the Continue watching prompt':'Continue watching prompt shown, no button found',{})}
+  if(yes)yes.click();
+ },4000);
 }
-if(typeof module!=="undefined")module.exports={ytAdShield}; // for tests
+if(typeof location!=='undefined'&&location.protocol==='https:'&&['music.youtube.com','www.youtube.com','youtube.com'].includes(location.hostname)){
+ contextBridge.exposeInMainWorld('__sixDiag',{log:line=>{if(typeof line==='string')ipcRenderer.send('six-diag',line.slice(0,400))}});
+ contextBridge.executeInMainWorld({func:ytAdShield});
+ contextBridge.executeInMainWorld({func:ytDiagnostics});
+}
+if(typeof module!=="undefined")module.exports={ytAdShield,ytDiagnostics}; // for tests

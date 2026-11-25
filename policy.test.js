@@ -21,3 +21,12 @@ test('frozen services close after 5 more idle minutes, never always-awake, pinne
  assert.deepEqual(discardCandidates(entries,'active',discardAfter-1),[]);
  assert.deepEqual(discardCandidates(entries,'active',discardAfter),['threads']);
 });
+test('a service that was audible a moment ago is not idle, so silent gaps between songs do not pause it',()=>{
+ const {recentlyAudible,audibleGrace,discardCandidates}=require('./policy');
+ const now=10*audibleGrace,base={id:'ytmusic',lastActive:0,keepAlive:false,audible:false};
+ assert.equal(recentlyAudible({...base,audibleAt:now-audibleGrace+1},now),true);assert.equal(recentlyAudible({...base,audibleAt:now-audibleGrace},now),false);
+ assert.equal(recentlyAudible({...base,audible:true},now),true);assert.equal(recentlyAudible(base,now),false);
+ assert.deepEqual(sleepCandidates([{...base,audibleAt:now-1000}],'teams',now),[]);
+ assert.deepEqual(sleepCandidates([{...base,audibleAt:now-audibleGrace-1}],'teams',now),['ytmusic']);
+ assert.deepEqual(discardCandidates([{...base,sleeping:true,sleptAt:0,audibleAt:now-1000}],'teams',now),[]);
+});

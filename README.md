@@ -60,6 +60,8 @@ To avoid dropping a call, Six watches only whether a call is active (a yes or no
 
 Six runs on [castlabs' Electron build](https://github.com/castlabs/electron-releases) (the `+wvcus` releases), which includes Widevine, so YouTube Music can play protected tracks. Widevine is only granted to YouTube's HTTPS pages for that tab, and it downloads the first time Six starts.
 
+If music stops by itself, Six keeps a small local log in `~/.config/Six/diagnostics.log`: when a service was paused or closed for being idle, which YouTube requests were blocked, and, for YouTube Music, each pause with the state of the player and whether you, a media key or YouTube caused it. A service that played sound in the last 3 minutes is never paused for being idle, so the silent gap between songs cannot freeze it. Six also answers YouTube Music's "Continue watching?" prompt for you. The log stays on your laptop and is trimmed at 200 KB.
+
 Google rejects sign-in from many embedded apps. On `accounts.google.com` and `accounts.youtube.com` Six presents a plain browser identity so the sign-in goes through.
 
 ## Install

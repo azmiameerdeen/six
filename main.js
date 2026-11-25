@@ -13,7 +13,7 @@ const {contentStyle,authStyle}=require('./content-style');
 const {applyAdblock}=require('./adblock');
 const {contextMenuItems}=require('./context-menu');
 const path=require('node:path'),fs=require('node:fs');
-const {services,startupServices,sleepCandidates,discardCandidates,safeURL,alwaysAwake}=require('./policy');
+const {services,startupServices,sleepCandidates,discardCandidates,recentlyAudible,safeURL,alwaysAwake}=require('./policy');
 app.setName('Six');
 // Cap each service's HTTP cache (Chromium otherwise grows it to gigabytes per service).
 app.commandLine.appendSwitch('disk-cache-size',String(256*1024*1024));
@@ -39,12 +39,13 @@ function setSleeping(id,sleeping){
  e.lifecycle=(e.lifecycle||Promise.resolve()).then(async()=>{
   const wc=e.view.webContents;
   if(quitting||views.get(id)!==e||wc.isDestroyed())return;
-  if(sleeping&&(id===active||alwaysAwake.has(id)||settings[id]||(id==='teams'&&(!e.callMonitorReady||e.callActive||e.sharePickerOpen))||wc.isCurrentlyAudible()||wc.isLoading()||[...popups.values()].includes(id)))return;
+  if(sleeping&&(id===active||alwaysAwake.has(id)||settings[id]||(id==='teams'&&(!e.callMonitorReady||e.callActive||e.sharePickerOpen))||wc.isCurrentlyAudible()||recentlyAudible(e,Date.now())||wc.isLoading()||[...popups.values()].includes(id)))return;
   if(!!e.sleeping===sleeping)return;
   if(!wc.debugger.isAttached()){wc.debugger.attach('1.3');e.lifecycleDebugger=true}
   if(!e.lifecycleDebugger)return; // Leave a user-opened developer session alone.
   await wc.debugger.sendCommand('Page.setWebLifecycleState',{state:sleeping?'frozen':'active'});
   e.sleeping=sleeping;e.sleptAt=sleeping?Date.now():0;
+  diag(id+(sleeping?' paused after being idle':' resumed'));
   if(!sleeping&&e.lifecycleDebugger){wc.debugger.detach();e.lifecycleDebugger=false}
   state();
  }).catch(()=>{if(!e.view.webContents.isDestroyed())console.warn('Six: could not change '+id+' sleep state')});
@@ -52,7 +53,17 @@ function setSleeping(id,sleeping){
 }
 // Record which hosts were blocked per service (adblock-blocked.txt in Six's data folder) to diagnose broken pages.
 const blockedHosts=new Map();let blockedWrite=null;
-function noteBlocked(id,url){let host;try{host=new URL(url).hostname}catch{return}const set=blockedHosts.get(id)||new Set();if(set.has(host))return;set.add(host);blockedHosts.set(id,set);
+// Small local diagnostics log (~/.config/Six/diagnostics.log): when services pause or close, and YouTube
+// Music's own pauses. Trimmed when it passes 200 KB. Nothing is sent anywhere.
+function diag(line){
+ try{
+  const file=path.join(app.getPath('userData'),'diagnostics.log');
+  try{if(fs.statSync(file).size>200*1024)fs.writeFileSync(file,fs.readFileSync(file,'utf8').slice(-100*1024))}catch{}
+  fs.appendFileSync(file,new Date().toISOString()+' '+String(line).replace(/[\r\n]+/g,' ')+'\n');
+ }catch{}
+}
+let blockedLogged=0;
+function noteBlocked(id,url){let host;try{const u=new URL(url);host=u.hostname;if(id==='ytmusic'&&blockedLogged++<200)diag('blocked request for ytmusic: '+host+u.pathname.slice(0,60))}catch{return}const set=blockedHosts.get(id)||new Set();if(set.has(host))return;set.add(host);blockedHosts.set(id,set);
  blockedWrite??=setTimeout(()=>{blockedWrite=null;try{fs.writeFileSync(path.join(app.getPath('userData'),'adblock-blocked.txt'),[...blockedHosts].map(([sid,hosts])=>sid+': '+[...hosts].sort().join(' ')).join('\n')+'\n')}catch{}},5000);}
 // Teams reports call activity; YouTube Music gets ad removal while ad blocking is on (applies when the tab next opens).
 function preloadFor(id){if(id==='teams')return path.join(__dirname,'teams-call-preload.js');if(id==='ytmusic'&&settings._adblock!==false)return path.join(__dirname,'ytmusic-preload.js')}
@@ -207,6 +218,7 @@ function make(s){
  });
  const view=new WebContentsView({webPreferences:{session:ses,preload:preloadFor(s.id),nodeIntegration:false,contextIsolation:true,sandbox:true,backgroundThrottling:true,webSecurity:true}}),wc=view.webContents;
  configureContents(wc,s,ses);
+ wc.on('audio-state-changed',ev=>{const entry=views.get(s.id);if(entry&&ev.audible)entry.audibleAt=Date.now()});
  wc.on('did-start-navigation',(_event,_url,_inPlace,isMainFrame)=>{if(s.id==='teams'&&isMainFrame&&!_inPlace){const e=views.get(s.id);if(e){e.callMonitorReady=false;e.callActive=false}}});
  wc.on('render-process-gone',(_event,details)=>{
   const current=views.get(s.id);if(!current||current.view.webContents!==wc)return; // intentional release
@@ -237,6 +249,12 @@ app.whenReady().then(()=>{
  });
  win.on('close',e=>{if(!quitting){e.preventDefault();win.hide()}});
  tray=new Tray(nativeImage.createFromPath(path.join(__dirname,'icon.png')).resize({width:24,height:24}));tray.setToolTip('Six');refreshControls();tray.on('click',()=>{win.show();win.focus();focusService()});
+ ipcMain.on('six-diag',(event,line)=>{ // YouTube Music's own pauses, from its page script
+  const e=views.get('ytmusic');
+  if(!e||event.sender!==e.view.webContents||typeof line!=='string')return;
+  let host;try{host=new URL(event.senderFrame.url).hostname}catch{return}
+  if(host==='youtube.com'||host.endsWith('.youtube.com'))diag('ytmusic page: '+line.slice(0,400));
+ });
  ipcMain.on('teams-call-status',(event,status)=>{
   const e=views.get('teams');
   if(!e||event.sender!==e.view.webContents)return;
@@ -265,7 +283,7 @@ app.whenReady().then(()=>{
   if(action==='home'){hideActive();active=null}
   state();
  });
- setInterval(()=>{const now=Date.now(),entries=[...views].map(([id,e])=>({id,lastActive:e.lastActive,sleeping:!!e.sleeping,sleptAt:e.sleptAt,keepAlive:!!settings[id]||[...popups.values()].includes(id),callActive:id==='teams'&&(!e.callMonitorReady||e.callActive||e.sharePickerOpen),audible:e.view.webContents.isCurrentlyAudible()}));for(const id of sleepCandidates(entries,active,now))setSleeping(id,true);for(const id of discardCandidates(entries,active,now))release(id);if(win.isVisible())state()},15000).unref(); // no UI updates while hidden in the tray
+ setInterval(()=>{const now=Date.now();for(const e of views.values())if(e.view.webContents.isCurrentlyAudible())e.audibleAt=now;const entries=[...views].map(([id,e])=>({id,lastActive:e.lastActive,sleeping:!!e.sleeping,sleptAt:e.sleptAt,keepAlive:!!settings[id]||[...popups.values()].includes(id),callActive:id==='teams'&&(!e.callMonitorReady||e.callActive||e.sharePickerOpen),audible:e.view.webContents.isCurrentlyAudible(),audibleAt:e.audibleAt}));for(const id of sleepCandidates(entries,active,now))setSleeping(id,true);for(const id of discardCandidates(entries,active,now)){diag(id+' closed after being idle');release(id)}if(win.isVisible())state()},15000).unref(); // no UI updates while hidden in the tray
 });
 process.on('SIGTERM',()=>{quitting=true;app.quit()});
 app.on('before-quit',event=>{
