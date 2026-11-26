@@ -2,6 +2,7 @@ const {components,desktopCapturer,app,BrowserWindow,WebContentsView,ipcMain,shel
 const {execFile}=require('node:child_process');
 const {checkForUpdate}=require('./electron-update');
 const {stageUpdate,pruneOldVersions,readBad}=require('./self-update');
+const {measureMemory,describeMemory}=require('./memory');
 const os=require('node:os');
 const {notificationsAllowed,audioMuted,browserUserAgent,popupAllowed,authUserAgent,isGoogleAuth,sanitizeAuthHeaders}=require('./notification-policy');
 const {teamsMediaAllowed,protectedMediaAllowed}=require('./media-policy');
@@ -27,10 +28,17 @@ if(!app.requestSingleInstanceLock()){app.quit()}else{
 let win,tray,updateInfo=null,updating=false,active=null,quitting=false,settings={},shutdownFlushing=false,shutdownSaved=false,sessions=new Set(),views=new Map(),popups=new Map(),crashes=new Map();
 // Write then rename, so a crash or power loss mid-save cannot leave a half-written settings file.
 function save(){const file=path.join(app.getPath('userData'),'settings.json');try{fs.writeFileSync(file+'.tmp',JSON.stringify(settings));fs.renameSync(file+'.tmp',file)}catch(err){console.warn('Six: could not save settings',err.message)}}
-let memorySample={at:0,value:0};
-function sampledMemory(){const now=Date.now();if(now-memorySample.at>=15000){memorySample={at:now,value:Math.round(app.getAppMetrics().reduce((a,p)=>a+p.memory.workingSetSize,0)/1024)}}return memorySample.value}
+let memorySample={at:0,total:0,services:{}},memoryBusy=false;
+// Measured in the background (reading /proc is not instant); callers get the latest finished sample.
+function sampledMemory(){
+ if(!memoryBusy&&Date.now()-memorySample.at>=15000){
+  memoryBusy=true;
+  measureMemory(app.getAppMetrics(),views).then(m=>{memorySample={at:Date.now(),...m}}).catch(()=>{}).finally(()=>{memoryBusy=false});
+ }
+ return memorySample.total;
+}
 function syncRenderingPriority(){updateRenderingPriority(views,active,win)}
-function state(){if(!win||win.isDestroyed())return;win.webContents.send('state',{active,quiet:!!settings._quiet,muteAll:!!settings._muteAll,services:services.map(s=>({...s,loaded:views.has(s.id),sleeping:!!views.get(s.id)?.sleeping,notifications:notificationsAllowed(settings,s.id),muted:audioMuted(settings,s.id),keepAlive:alwaysAwake.has(s.id)||!!settings[s.id],alwaysAwake:alwaysAwake.has(s.id)})),memory:sampledMemory()})}
+function state(){if(!win||win.isDestroyed())return;win.webContents.send('state',{active,quiet:!!settings._quiet,muteAll:!!settings._muteAll,services:services.map(s=>({...s,loaded:views.has(s.id),sleeping:!!views.get(s.id)?.sleeping,notifications:notificationsAllowed(settings,s.id),muted:audioMuted(settings,s.id),keepAlive:alwaysAwake.has(s.id)||!!settings[s.id],alwaysAwake:alwaysAwake.has(s.id),memoryMB:memorySample.services[s.id]||0})),memory:sampledMemory()})}
 function layout(){for(const e of views.values())layoutServiceView(win,e)}
 function release(id){const e=views.get(id);if(!e)return;e.view.webContents.session.flushStorageData();views.delete(id);if(e.attached)win.contentView.removeChildView(e.view);e.view.webContents.close({waitForBeforeUnload:false})}
 // Freeze page timers without destroying its renderer or in-memory state.
@@ -244,6 +252,7 @@ app.whenReady().then(()=>{
   select(startupServices[0].id);
   setTimeout(checkElectronUpdate,60000).unref(); // once Six has settled
   setInterval(checkElectronUpdate,24*60*60*1000).unref();
+  setInterval(()=>measureMemory(app.getAppMetrics(),views).then(m=>diag(describeMemory(m))).catch(()=>{}),10*60*1000).unref(); // memory history in the diagnostics log
   setTimeout(confirmElectronTrial,20000).unref();
   startupServices.slice(1).forEach((s,i)=>setTimeout(()=>{if(!quitting&&!views.has(s.id)){make(s);state()}},(i+1)*800).unref());
  });

@@ -7,17 +7,18 @@ function controlsFor(s){
  if(serviceControls.has(s.id))return serviceControls.get(s.id);
  const item=document.createElement('button');item.setAttribute('aria-label',s.name);item.className='item';item.innerHTML='<span class="glyph"><img alt="" draggable="false"></span><span class="name"></span><span class="status"></span>';
  item.querySelector('img').src=s.icon;item.querySelector('.glyph').style.color=s.color;item.querySelector('.name').textContent=s.name;item.onclick=()=>window.six.action('select',s.id);$('#nav').append(item);
- const card=document.createElement('article');card.className='card';card.innerHTML='<div class="card-top"><span class="glyph"><img alt="" draggable="false"></span><button class="pin"></button></div><button class="launch"><h2></h2><small></small></button>';
+ const card=document.createElement('article');card.className='card';card.innerHTML='<div class="card-top"><span class="glyph"><img alt="" draggable="false"></span><button class="pin"></button></div><button class="launch"><h2></h2><small></small><span class="mem"></span></button>';
  card.querySelector('img').src=s.icon;card.querySelector('.glyph').style.color=s.color;card.querySelector('h2').textContent=s.name;
  const pin=card.querySelector('.pin');pin.title='Keeps this service in memory for notifications. Uses more resources.';pin.onclick=()=>window.six.action('pin',s.id);card.querySelector('.launch').onclick=()=>window.six.action('select',s.id);$('#cards').append(card);
- const controls={item,card,pin,status:item.querySelector('.status'),description:card.querySelector('small')};serviceControls.set(s.id,controls);return controls;
+ const controls={item,card,pin,status:item.querySelector('.status'),description:card.querySelector('small'),mem:card.querySelector('.mem')};serviceControls.set(s.id,controls);return controls;
 }
 window.six.onState(state=>{
  $('#heading').textContent=state.active?state.services.find(s=>s.id===state.active).name:'Your daily orbit';
- $('#memory').textContent=state.memory+' MB · app processes';
+ $('#memory').textContent=state.memory?state.memory+' MB · app processes':'Measuring…';
+ for(const s of state.services){const c=serviceControls.get(s.id);if(c)c.mem.textContent=s.loaded&&s.memoryMB?s.memoryMB+' MB in use':''}
  $('#loaded').textContent=state.services.filter(s=>s.loaded&&!s.sleeping).length+' awake';
  // Memory samples and unread titles must not rebuild buttons or invalidate their layout.
- const controlsKey=JSON.stringify([state.active,state.quiet,state.muteAll,state.services.map(({title,...service})=>service)]);
+ const controlsKey=JSON.stringify([state.active,state.quiet,state.muteAll,state.services.map(({title,memoryMB,...service})=>service)]);
  if(controlsKey===lastControlsKey)return;
  lastControlsKey=controlsKey;
  const selected=state.services.find(s=>s.id===state.active);

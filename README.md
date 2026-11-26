@@ -32,7 +32,7 @@ Each service has its own saved login, kept separate from the others.
 - **Hardware video.** Video decoding and encoding run on the graphics chip through VA-API (on Intel, install `intel-media-va-driver`). If video glitches or shows black frames, add `"_hardwareVideo":false` to `~/.config/Six/settings.json` and restart Six.
 - **Self-healing.** If an always-awake, pinned or open service crashes, Six restarts it, up to 3 times in 10 minutes.
 
-The memory figure on the home screen adds up the working sets of all Six processes. Shared memory can be counted more than once, so it is an estimate, not an exact footprint.
+The memory figure on the home screen is Six's real footprint: it uses the kernel's PSS numbers, which count memory shared between processes once. (A system monitor that adds up each process's resident memory shows a much bigger total, around 50% more.) Each open service's card also shows how much its page uses, and the same breakdown is written to `~/.config/Six/diagnostics.log` every 10 minutes, so you can see which service is growing.
 
 ## Notifications and sound
 
@@ -124,5 +124,6 @@ To turn the check off, add `"_electronUpdateCheck":false` to `~/.config/Six/sett
 | `update-electron.sh`, `install-update.sh` | The `/opt` install: one-click Electron update, and the copy-into-`/opt` installer |
 | `context-menu.js`, `content-style.js` | Right-click menu and page styling |
 | `index.html`, `renderer.js`, `preload.js`, `style.css` | Six's own window: the tab bar and home screen |
+| `memory.js` | Memory figures (PSS) for the home screen and the log |
 | `service-views.js`, `rendering-priority.js`, `telegram-latest.js` | Showing and hiding service pages, background throttling, the Telegram **Latest** button |
 | `*.test.js` | Tests, run with `npm test` |
