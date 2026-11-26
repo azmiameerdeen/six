@@ -30,3 +30,22 @@ test('a service that was audible a moment ago is not idle, so silent gaps betwee
  assert.deepEqual(sleepCandidates([{...base,audibleAt:now-audibleGrace-1}],'teams',now),['ytmusic']);
  assert.deepEqual(discardCandidates([{...base,sleeping:true,sleptAt:0,audibleAt:now-1000}],'teams',now),[]);
 });
+test('low-memory mode starts below 2 GB, ends above 2.5 GB, and keeps its state when memory is unknown',()=>{
+ const {nextLowMemory}=require('./policy');
+ assert.equal(nextLowMemory(false,5000),false);assert.equal(nextLowMemory(false,2047),true);assert.equal(nextLowMemory(false,2048),false);
+ assert.equal(nextLowMemory(true,2300),true);   // between the two limits: stays as it was, so it does not flap
+ assert.equal(nextLowMemory(true,2559),true);assert.equal(nextLowMemory(true,2560),false);
+ assert.equal(nextLowMemory(true,null),true);assert.equal(nextLowMemory(false,undefined),false);assert.equal(nextLowMemory(false,0),false);
+});
+test('under low memory idle services pause after 2 minutes and close a minute later, with the usual protections',()=>{
+ const {idleDelays,sleepCandidates,discardCandidates,hibernateAfter,discardAfter}=require('./policy');
+ const normal=idleDelays(false),low=idleDelays(true);
+ assert.deepEqual(normal,{sleep:hibernateAfter,discard:discardAfter});assert.equal(low.sleep+low.discard,3*60*1000);
+ const now=10*60*1000,e=id=>({id,lastActive:now-2.5*60*1000,keepAlive:false});
+ const entries=[e('threads'),e('whatsapp'),e('teams'),{...e('discord'),keepAlive:true},{...e('instagram'),audible:true},{...e('ytmusic'),audibleAt:now-1000}];
+ assert.deepEqual(sleepCandidates(entries,'duckai',now,normal.sleep),[]);                          // 2.5 min idle is fine when memory is fine
+ assert.deepEqual(sleepCandidates(entries,'teams',now,low.sleep),['threads']);                    // teams is the one in use; pinned, audible and recent-sound services stay
+ assert.deepEqual(sleepCandidates([{...e('teams'),callActive:true}],'x',now,low.sleep),[]);        // a call is never idle
+ const frozen={...e('threads'),sleeping:true,sleptAt:now-90*1000};
+ assert.deepEqual(discardCandidates([frozen],'x',now,low.discard),['threads']);assert.deepEqual(discardCandidates([frozen],'x',now,normal.discard),[]);
+});

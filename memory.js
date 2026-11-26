@@ -30,4 +30,13 @@ function describeMemory(m){
  return 'memory '+m.total+' MB in total; page by service: '+(parts.join(', ')||'none open');
 }
 
-module.exports={readPssKB,measureMemory,describeMemory};
+// Memory the system could give to a program without swapping, from /proc/meminfo text (null if unreadable).
+function parseAvailableMB(text){
+ const m=/^MemAvailable:\s+(\d+) kB/m.exec(String(text));
+ return m?Math.round(Number(m[1])/1024):null;
+}
+function availableMB(readFileSync=fs.readFileSync){
+ try{return parseAvailableMB(readFileSync('/proc/meminfo','utf8'))}catch{return null}
+}
+
+module.exports={readPssKB,measureMemory,describeMemory,parseAvailableMB,availableMB};

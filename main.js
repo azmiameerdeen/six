@@ -2,7 +2,7 @@ const {components,desktopCapturer,app,BrowserWindow,WebContentsView,ipcMain,shel
 const {execFile}=require('node:child_process');
 const {checkForUpdate}=require('./electron-update');
 const {stageUpdate,pruneOldVersions,readBad}=require('./self-update');
-const {measureMemory,describeMemory}=require('./memory');
+const {measureMemory,describeMemory,availableMB}=require('./memory');
 const os=require('node:os');
 const {notificationsAllowed,audioMuted,browserUserAgent,popupAllowed,authUserAgent,isGoogleAuth,sanitizeAuthHeaders}=require('./notification-policy');
 const {teamsMediaAllowed,protectedMediaAllowed}=require('./media-policy');
@@ -14,7 +14,7 @@ const {contentStyle,authStyle}=require('./content-style');
 const {applyAdblock}=require('./adblock');
 const {contextMenuItems}=require('./context-menu');
 const path=require('node:path'),fs=require('node:fs');
-const {services,startupServices,sleepCandidates,discardCandidates,recentlyAudible,safeURL,alwaysAwake}=require('./policy');
+const {services,startupServices,sleepCandidates,discardCandidates,nextLowMemory,idleDelays,recentlyAudible,safeURL,alwaysAwake}=require('./policy');
 app.setName('Six');
 // Cap each service's HTTP cache (Chromium otherwise grows it to gigabytes per service).
 app.commandLine.appendSwitch('disk-cache-size',String(256*1024*1024));
@@ -25,7 +25,7 @@ if(hardwareVideo)app.commandLine.appendSwitch('enable-features','AcceleratedVide
 // castlabs Electron ships Widevine through a component updater; stock Electron has no `components`.
 const widevineReady=app.whenReady().then(()=>components?.whenReady()).catch(err=>console.warn('Six: Widevine unavailable',err));
 if(!app.requestSingleInstanceLock()){app.quit()}else{
-let win,tray,updateInfo=null,updating=false,active=null,quitting=false,settings={},shutdownFlushing=false,shutdownSaved=false,sessions=new Set(),views=new Map(),popups=new Map(),crashes=new Map();
+let lowMemory=false,win,tray,updateInfo=null,updating=false,active=null,quitting=false,settings={},shutdownFlushing=false,shutdownSaved=false,sessions=new Set(),views=new Map(),popups=new Map(),crashes=new Map();
 // Write then rename, so a crash or power loss mid-save cannot leave a half-written settings file.
 function save(){const file=path.join(app.getPath('userData'),'settings.json');try{fs.writeFileSync(file+'.tmp',JSON.stringify(settings));fs.renameSync(file+'.tmp',file)}catch(err){console.warn('Six: could not save settings',err.message)}}
 let memorySample={at:0,total:0,services:{}},memoryBusy=false;
@@ -138,6 +138,25 @@ function installElectronUpdate(){
   if(err.code===126||err.code===127)return; // password prompt dismissed
   dialog.showMessageBox(win&&!win.isDestroyed()?win:undefined,{type:'error',title:'Electron update failed',message:'Electron '+version+' was not installed',detail:String(stderr||err.message).slice(-600)+'\n\nSix keeps running on '+electronVersion.split('+')[0]+'.'}).catch(()=>{});
  });
+}
+// "Free memory" on a card: reload a service that is in use or must stay awake (WhatsApp, Telegram, pinned),
+// close any other one completely. Calls, meetings and playing music are never interrupted without asking.
+async function freeMemory(id){
+ const e=views.get(id),s=services.find(x=>x.id===id);
+ if(!e||!s||e.view.webContents.isDestroyed())return;
+ const parent=win&&!win.isDestroyed()?win:undefined;
+ if(id==='teams'&&(e.callActive||e.sharePickerOpen)){
+  await dialog.showMessageBox(parent,{type:'info',title:'Teams is busy',message:'Teams is in a call or sharing',detail:'Six will not reload it now. Try again after the call.',buttons:['OK']});
+  return;
+ }
+ if(id==='teams'||id==='discord'||e.view.webContents.isCurrentlyAudible()){
+  const {response}=await dialog.showMessageBox(parent,{type:'warning',title:'Free memory',message:'Reload '+s.name+' to free memory?',detail:'Anything in progress there, such as a call, a meeting or music, will stop.',buttons:['Reload','Cancel'],defaultId:1,cancelId:1});
+  if(response!==0||views.get(id)!==e)return;
+ }
+ const keepLoaded=active===id||alwaysAwake.has(id)||!!settings[id];
+ diag('freeing memory on request: '+id+(keepLoaded?' reloaded':' closed'));
+ if(keepLoaded){e.lastActive=Date.now();e.view.webContents.reload()}else release(id);
+ state();
 }
 function refreshControls(){
  for(const [id,e] of views)e.view.webContents.setAudioMuted(audioMuted(settings,id));
@@ -283,6 +302,7 @@ app.whenReady().then(()=>{
   if(action==='maximize'){if(win.isMaximized())win.unmaximize();else win.maximize()}
   if(action==='close')win.close();
   if(action==='select'&&s){select(s.id);return}
+  if(action==='free'&&s){freeMemory(s.id);return}
   if(action==='pin'&&s&&!alwaysAwake.has(id)){settings[id]=!settings[id];save();if(settings[id])setSleeping(id,false)}
   if(action==='sleep'&&s&&id!==active&&!alwaysAwake.has(id))setSleeping(id,true);
   if(action==='latest'&&active==='telegram'){const wc=views.get(active)?.view.webContents;if(wc)wc.executeJavaScript('('+jumpTelegramLatest.toString()+')()',true).catch(()=>{})}
@@ -292,7 +312,7 @@ app.whenReady().then(()=>{
   if(action==='home'){hideActive();active=null}
   state();
  });
- setInterval(()=>{const now=Date.now();for(const e of views.values())if(e.view.webContents.isCurrentlyAudible())e.audibleAt=now;const entries=[...views].map(([id,e])=>({id,lastActive:e.lastActive,sleeping:!!e.sleeping,sleptAt:e.sleptAt,keepAlive:!!settings[id]||[...popups.values()].includes(id),callActive:id==='teams'&&(!e.callMonitorReady||e.callActive||e.sharePickerOpen),audible:e.view.webContents.isCurrentlyAudible(),audibleAt:e.audibleAt}));for(const id of sleepCandidates(entries,active,now))setSleeping(id,true);for(const id of discardCandidates(entries,active,now)){diag(id+' closed after being idle');release(id)}if(win.isVisible())state()},15000).unref(); // no UI updates while hidden in the tray
+ setInterval(()=>{const now=Date.now();const available=availableMB(),was=lowMemory;lowMemory=nextLowMemory(lowMemory,available);if(lowMemory!==was)diag(lowMemory?'memory is low ('+available+' MB available): idle services close sooner':'memory has recovered ('+available+' MB available): normal idle timing');const delays=idleDelays(lowMemory);for(const e of views.values())if(e.view.webContents.isCurrentlyAudible())e.audibleAt=now;const entries=[...views].map(([id,e])=>({id,lastActive:e.lastActive,sleeping:!!e.sleeping,sleptAt:e.sleptAt,keepAlive:!!settings[id]||[...popups.values()].includes(id),callActive:id==='teams'&&(!e.callMonitorReady||e.callActive||e.sharePickerOpen),audible:e.view.webContents.isCurrentlyAudible(),audibleAt:e.audibleAt}));for(const id of sleepCandidates(entries,active,now,delays.sleep))setSleeping(id,true);for(const id of discardCandidates(entries,active,now,delays.discard)){diag(id+' closed after being idle');release(id)}if(win.isVisible())state()},15000).unref(); // no UI updates while hidden in the tray
 });
 process.on('SIGTERM',()=>{quitting=true;app.quit()});
 app.on('before-quit',event=>{

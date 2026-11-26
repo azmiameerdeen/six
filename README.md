@@ -26,6 +26,8 @@ Each service has its own saved login, kept separate from the others.
 - **Starts small.** Only WhatsApp and Telegram load at startup, including when Six starts hidden in the tray. The others load when you open them.
 - **Pauses what you are not using.** A service you have not used for 5 minutes is paused: its page and drafts stay in memory, but background work stops.
 - **Frees memory.** After 5 more minutes (10 in total) a paused service is closed to give its memory back. It reloads when you open it again, and you stay signed in.
+- **Quicker when memory runs short.** If the system has less than about 2 GB of memory free, idle services are paused after 2 minutes and closed a minute later (3 in all), until more than about 2.5 GB is free again. When memory is fine, nothing changes.
+- **Free memory on demand.** Each open service's card has a **Free memory** button. It reloads WhatsApp, Telegram, pinned services and the one you are in, and closes any other service completely. It asks first for Teams, Discord and anything playing sound, and it refuses while Teams is in a call or sharing.
 - **Never closed:** WhatsApp, Telegram, services you set to **Keep awake**, services with a sign-in popup open, calls, and anything playing audio.
 - **Capped cache.** Each service's web cache is limited to 256 MB.
 - **Quiet in the tray.** Closing the window keeps Six running in the tray. Six stops refreshing its own screen while hidden.

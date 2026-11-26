@@ -13,5 +13,15 @@ function sleepCandidates(entries,active,now,delay=hibernateAfter){return entries
 // Frozen pages still hold their memory; close them after a longer idle so the RAM is returned.
 const discardAfter=5*60*1000; // closed 10 minutes after last use (5 to pause + 5 more)
 function discardCandidates(entries,active,now,delay=discardAfter){return entries.filter(e=>e.sleeping&&e.id!==active&&!alwaysAwake.has(e.id)&&!e.keepAlive&&!e.callActive&&!recentlyAudible(e,now)&&now-(e.sleptAt||0)>=delay).map(e=>e.id)}
+// When the system runs short of memory, idle services are paused sooner and closed a minute later
+// (3 minutes in all instead of 10). Normal timing returns once memory has recovered. WhatsApp, Telegram,
+// pinned services, calls, sound and the service in use are protected exactly as before.
+const lowMemoryEnterMB=2048, lowMemoryLeaveMB=2560;
+const lowMemoryHibernateAfter=2*60*1000, lowMemoryDiscardAfter=60*1000;
+function nextLowMemory(wasLow,availableMB){
+ if(!(availableMB>0))return wasLow;                       // unknown: keep the current mode
+ return wasLow?availableMB<lowMemoryLeaveMB:availableMB<lowMemoryEnterMB;
+}
+function idleDelays(lowMemory){return lowMemory?{sleep:lowMemoryHibernateAfter,discard:lowMemoryDiscardAfter}:{sleep:hibernateAfter,discard:discardAfter}}
 function safeURL(value){try{return ['https:','http:'].includes(new URL(value).protocol)}catch{return false}}
-module.exports={services,startupServices,sleepCandidates,discardCandidates,recentlyAudible,safeURL,alwaysAwake,hibernateAfter,discardAfter,audibleGrace};
+module.exports={services,startupServices,sleepCandidates,discardCandidates,nextLowMemory,idleDelays,lowMemoryEnterMB,lowMemoryLeaveMB,recentlyAudible,safeURL,alwaysAwake,hibernateAfter,discardAfter,audibleGrace};

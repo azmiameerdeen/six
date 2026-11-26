@@ -21,3 +21,10 @@ test('the log line lists services from largest to smallest',()=>{
  assert.equal(describeMemory({total:2300,services:{telegram:400,whatsapp:790}}),'memory 2300 MB in total; page by service: whatsapp 790, telegram 400');
  assert.match(describeMemory({total:900,services:{}}),/none open/);
 });
+test('available memory is read from /proc/meminfo, and unreadable input gives null',()=>{
+ const {parseAvailableMB,availableMB}=require('./memory');
+ const text='MemTotal:       15019788 kB\nMemFree:         1700000 kB\nMemAvailable:    7654321 kB\nBuffers: 1 kB\n';
+ assert.equal(parseAvailableMB(text),Math.round(7654321/1024));
+ assert.equal(parseAvailableMB('nothing'),null);assert.equal(parseAvailableMB(undefined),null);
+ assert.equal(availableMB(()=>text),Math.round(7654321/1024));assert.equal(availableMB(()=>{throw new Error('no /proc')}),null);
+});
