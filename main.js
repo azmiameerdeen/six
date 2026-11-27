@@ -5,7 +5,7 @@ const {stageUpdate,pruneOldVersions,readBad}=require('./self-update');
 const {measureMemory,describeMemory,availableMB}=require('./memory');
 const os=require('node:os');
 const {notificationsAllowed,audioMuted,browserUserAgent,popupAllowed,authUserAgent,isGoogleAuth,sanitizeAuthHeaders}=require('./notification-policy');
-const {teamsMediaAllowed,protectedMediaAllowed,clipboardWriteAllowed}=require('./media-policy');
+const {teamsMediaAllowed,protectedMediaAllowed,clipboardWriteAllowed,persistentStorageAllowed}=require('./media-policy');
 const {jumpTelegramLatest}=require('./telegram-latest');
 const {makeScreenShareHandler,sourceLabel}=require('./screen-sharing');
 const {updateRenderingPriority}=require('./rendering-priority');
@@ -242,14 +242,14 @@ function make(s){
  applyAdblock(ses,settings._adblock!==false,url=>noteBlocked(s.id,url));
  ses.setPermissionCheckHandler((_wc,permission,origin,details)=>{
   const from=details?.securityOrigin||origin;
-  if(teamsMediaAllowed(s.id,permission,from)||protectedMediaAllowed(s.id,permission,from)||clipboardWriteAllowed(permission,from))return true;
+  if(teamsMediaAllowed(s.id,permission,from)||protectedMediaAllowed(s.id,permission,from)||clipboardWriteAllowed(permission,from)||persistentStorageAllowed(s.id,permission,from))return true;
   if(permission==='notifications')return notificationsAllowed(settings,s.id);
   noteDenied(s.id,permission,from);
   return false;
  });
  ses.setPermissionRequestHandler(async(wc,permission,callback,details)=>{
   const from=details.requestingUrl||wc?.getURL();
-  if(teamsMediaAllowed(s.id,permission,from)||protectedMediaAllowed(s.id,permission,from)||clipboardWriteAllowed(permission,from))return callback(true);
+  if(teamsMediaAllowed(s.id,permission,from)||protectedMediaAllowed(s.id,permission,from)||clipboardWriteAllowed(permission,from)||persistentStorageAllowed(s.id,permission,from))return callback(true);
   if(permission==='notifications')return callback(notificationsAllowed(settings,s.id));
   if(permission==='media'){
    const result=await dialog.showMessageBox(win,{type:'question',buttons:['Deny','Allow'],defaultId:0,cancelId:0,message:s.name+' requests microphone / camera access',detail:'Origin: '+(details.requestingUrl||wc.getURL())});callback(result.response===1);

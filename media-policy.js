@@ -15,4 +15,9 @@ function clipboardWriteAllowed(permission,origin){
  if(permission!=='clipboard-sanitized-write')return false;
  try{return new URL(origin).protocol==='https:'}catch{return false}
 }
-module.exports={teamsMediaAllowed,protectedMediaAllowed,clipboardWriteAllowed};
+// WhatsApp asks the browser to keep its offline data from being cleaned up when disk space runs low.
+function persistentStorageAllowed(service,permission,origin){
+ if(service!=='whatsapp'||permission!=='persistent-storage')return false;
+ try{const u=new URL(origin);return u.protocol==='https:'&&(u.hostname==='whatsapp.com'||u.hostname.endsWith('.whatsapp.com'))}catch{return false}
+}
+module.exports={teamsMediaAllowed,protectedMediaAllowed,clipboardWriteAllowed,persistentStorageAllowed};

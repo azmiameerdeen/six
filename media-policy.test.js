@@ -21,3 +21,12 @@ test('copy buttons may write to the clipboard on HTTPS pages; reading it and oth
  assert.equal(clipboardWriteAllowed('clipboard-sanitized-write','not a url'),false);assert.equal(clipboardWriteAllowed('clipboard-sanitized-write',undefined),false);
  for(const p of ['clipboard-read','geolocation','midi','notifications','media'])assert.equal(clipboardWriteAllowed(p,'https://teams.microsoft.com/'),false,p);
 });
+test('persistent storage is allowed for WhatsApp on its own HTTPS pages and nowhere else',()=>{
+ const {persistentStorageAllowed}=require('./media-policy');
+ assert.equal(persistentStorageAllowed('whatsapp','persistent-storage','https://web.whatsapp.com/'),true);
+ assert.equal(persistentStorageAllowed('whatsapp','persistent-storage','http://web.whatsapp.com/'),false);
+ assert.equal(persistentStorageAllowed('whatsapp','persistent-storage','https://whatsapp.com.evil.test/'),false);
+ assert.equal(persistentStorageAllowed('telegram','persistent-storage','https://web.whatsapp.com/'),false);
+ assert.equal(persistentStorageAllowed('whatsapp','persistent-storage','garbage'),false);
+ for(const p of ['background-sync','geolocation','clipboard-read','notifications'])assert.equal(persistentStorageAllowed('whatsapp',p,'https://web.whatsapp.com/'),false,p);
+});
