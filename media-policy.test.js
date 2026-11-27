@@ -13,3 +13,11 @@ test('Widevine is allowed only for YouTube Music on YouTube over HTTPS',()=>{
  assert.equal(protectedMediaAllowed('discord','mediaKeySystem','https://music.youtube.com/'),false);
  assert.equal(protectedMediaAllowed('ytmusic','media','https://music.youtube.com/'),false);
 });
+test('copy buttons may write to the clipboard on HTTPS pages; reading it and other permissions stay denied',()=>{
+ const {clipboardWriteAllowed}=require('./media-policy');
+ assert.equal(clipboardWriteAllowed('clipboard-sanitized-write','https://teams.microsoft.com/v2/'),true);
+ assert.equal(clipboardWriteAllowed('clipboard-sanitized-write','https://duckduckgo.com/'),true);
+ assert.equal(clipboardWriteAllowed('clipboard-sanitized-write','http://example.com/'),false);
+ assert.equal(clipboardWriteAllowed('clipboard-sanitized-write','not a url'),false);assert.equal(clipboardWriteAllowed('clipboard-sanitized-write',undefined),false);
+ for(const p of ['clipboard-read','geolocation','midi','notifications','media'])assert.equal(clipboardWriteAllowed(p,'https://teams.microsoft.com/'),false,p);
+});

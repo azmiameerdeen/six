@@ -8,4 +8,11 @@ function protectedMediaAllowed(service,permission,origin){
  if(service!=='ytmusic'||permission!=='mediaKeySystem')return false;
  try{const u=new URL(origin);return u.protocol==='https:'&&musicHosts.includes(u.hostname)}catch{return false}
 }
-module.exports={teamsMediaAllowed,protectedMediaAllowed};
+// "Copy" buttons use the async clipboard API, which needs this permission (Chromium only lets a page use it
+// while the user is interacting with it). Writing is allowed on any HTTPS page; reading the clipboard
+// ('clipboard-read') stays denied.
+function clipboardWriteAllowed(permission,origin){
+ if(permission!=='clipboard-sanitized-write')return false;
+ try{return new URL(origin).protocol==='https:'}catch{return false}
+}
+module.exports={teamsMediaAllowed,protectedMediaAllowed,clipboardWriteAllowed};

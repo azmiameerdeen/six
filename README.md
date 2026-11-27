@@ -106,7 +106,7 @@ To turn the check off, add `"_electronUpdateCheck":false` to `~/.config/Six/sett
 
 - Service pages run in sandboxed renderers with context isolation and web security on, and have no Node access.
 - Each service has its own stored session. Six never handles your passwords itself.
-- Camera and microphone requests ask for approval (except on Teams addresses, above). Other device permissions are denied.
+- Camera and microphone requests ask for approval (except on Teams addresses, above). Pages may write to the clipboard, so Copy buttons work, but they cannot read it. Other permissions are denied, and the first refusal for each service and site is noted in `~/.config/Six/diagnostics.log`.
 - Sign-in popups from trusted domains open inside Six, in a sandbox that shares the service's session. Other links open in your system browser.
 - Teams and YouTube Music add small page scripts for call status and ad removal, and every service gets one for notifications. They do nothing else.
 

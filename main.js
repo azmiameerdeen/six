@@ -5,7 +5,7 @@ const {stageUpdate,pruneOldVersions,readBad}=require('./self-update');
 const {measureMemory,describeMemory,availableMB}=require('./memory');
 const os=require('node:os');
 const {notificationsAllowed,audioMuted,browserUserAgent,popupAllowed,authUserAgent,isGoogleAuth,sanitizeAuthHeaders}=require('./notification-policy');
-const {teamsMediaAllowed,protectedMediaAllowed}=require('./media-policy');
+const {teamsMediaAllowed,protectedMediaAllowed,clipboardWriteAllowed}=require('./media-policy');
 const {jumpTelegramLatest}=require('./telegram-latest');
 const {makeScreenShareHandler,sourceLabel}=require('./screen-sharing');
 const {updateRenderingPriority}=require('./rendering-priority');
@@ -69,6 +69,14 @@ function diag(line){
   try{if(fs.statSync(file).size>200*1024)fs.writeFileSync(file,fs.readFileSync(file,'utf8').slice(-100*1024))}catch{}
   fs.appendFileSync(file,new Date().toISOString()+' '+String(line).replace(/[\r\n]+/g,' ')+'\n');
  }catch{}
+}
+// Record the first time a page is refused a permission (once per service, permission and site), to see what breaks.
+const deniedSeen=new Set();
+function noteDenied(id,permission,url){
+ let host='?';try{host=new URL(url).hostname}catch{}
+ const key=id+'|'+permission+'|'+host;
+ if(deniedSeen.has(key))return;deniedSeen.add(key);
+ diag('denied permission '+permission+' for '+id+' ('+host+')');
 }
 let blockedLogged=0;
 function noteBlocked(id,url){let host;try{const u=new URL(url);host=u.hostname;if(id==='ytmusic'&&blockedLogged++<200)diag('blocked request for ytmusic: '+host+u.pathname.slice(0,60))}catch{return}const set=blockedHosts.get(id)||new Set();if(set.has(host))return;set.add(host);blockedHosts.set(id,set);
@@ -233,15 +241,19 @@ function make(s){
  });
  applyAdblock(ses,settings._adblock!==false,url=>noteBlocked(s.id,url));
  ses.setPermissionCheckHandler((_wc,permission,origin,details)=>{
-  if(teamsMediaAllowed(s.id,permission,details?.securityOrigin||origin)||protectedMediaAllowed(s.id,permission,details?.securityOrigin||origin))return true;
-  return permission==='notifications'&&notificationsAllowed(settings,s.id);
+  const from=details?.securityOrigin||origin;
+  if(teamsMediaAllowed(s.id,permission,from)||protectedMediaAllowed(s.id,permission,from)||clipboardWriteAllowed(permission,from))return true;
+  if(permission==='notifications')return notificationsAllowed(settings,s.id);
+  noteDenied(s.id,permission,from);
+  return false;
  });
  ses.setPermissionRequestHandler(async(wc,permission,callback,details)=>{
-  if(teamsMediaAllowed(s.id,permission,details.requestingUrl||wc?.getURL())||protectedMediaAllowed(s.id,permission,details.requestingUrl||wc?.getURL()))return callback(true);
+  const from=details.requestingUrl||wc?.getURL();
+  if(teamsMediaAllowed(s.id,permission,from)||protectedMediaAllowed(s.id,permission,from)||clipboardWriteAllowed(permission,from))return callback(true);
   if(permission==='notifications')return callback(notificationsAllowed(settings,s.id));
   if(permission==='media'){
    const result=await dialog.showMessageBox(win,{type:'question',buttons:['Deny','Allow'],defaultId:0,cancelId:0,message:s.name+' requests microphone / camera access',detail:'Origin: '+(details.requestingUrl||wc.getURL())});callback(result.response===1);
-  }else callback(false);
+  }else{noteDenied(s.id,permission,from);callback(false)}
  });
  const view=new WebContentsView({webPreferences:{session:ses,preload:preloadFor(s.id),nodeIntegration:false,contextIsolation:true,sandbox:true,backgroundThrottling:true,webSecurity:true}}),wc=view.webContents;
  configureContents(wc,s,ses);
